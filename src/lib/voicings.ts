@@ -67,16 +67,86 @@ function rootFretsForString(openMidi: number, rootChroma: number, maxFret: numbe
   return frets;
 }
 
+// Calculate finger positions and barres for a chord shape
+function calculateFingering(frets: number[]): { fingers: number[]; barres: number[]; baseFret: number } {
+  const fingers = new Array(6).fill(0);
+  const positiveFrets = frets.map((f, i) => ({ fret: f, string: i })).filter(x => x.fret > 0);
+  
+  if (positiveFrets.length === 0) {
+    return { fingers, barres: [], baseFret: 1 };
+  }
+  
+  const minFret = Math.min(...positiveFrets.map(x => x.fret));
+  const baseFret = minFret;
+  
+  // Count strings at each fret position
+  const fretCounts = new Map<number, number[]>();
+  positiveFrets.forEach(({ fret, string }) => {
+    if (!fretCounts.has(fret)) fretCounts.set(fret, []);
+    fretCounts.get(fret)!.push(string);
+  });
+  
+  // Detect barres: a fret that has multiple consecutive strings pressed
+  const barres: number[] = [];
+  fretCounts.forEach((strings, fret) => {
+    if (strings.length >= 2 && fret === minFret) {
+      const sorted = strings.sort((a, b) => a - b);
+      // Check if strings are consecutive or span a range
+      if (sorted[sorted.length - 1] - sorted[0] >= 1) {
+        barres.push(fret);
+      }
+    }
+  });
+  
+  // Simple finger assignment algorithm
+  // Finger 1 is for barre or lowest fret
+  // Fingers 2-4 for other notes
+  
+  let nextFinger = barres.length > 0 ? 2 : 1;
+  
+  // Sort by fret, then by string (high to low)
+  const sortedNotes = [...positiveFrets].sort((a, b) => {
+    if (a.fret !== b.fret) return a.fret - b.fret;
+    return b.string - a.string; // higher strings first
+  });
+  
+  const usedFingers = new Map<number, number>(); // fret -> finger
+  
+  for (const { fret, string } of sortedNotes) {
+    // Skip strings that are part of barre
+    if (barres.includes(fret)) {
+      fingers[string] = 1;
+      continue;
+    }
+    
+    // Check if we already assigned a finger to this fret
+    if (usedFingers.has(fret)) {
+      fingers[string] = usedFingers.get(fret)!;
+    } else {
+      // Assign next available finger
+      const finger = Math.min(nextFinger, 4);
+      fingers[string] = finger;
+      usedFingers.set(fret, finger);
+      nextFinger++;
+    }
+  }
+  
+  return { fingers, barres, baseFret };
+}
+
 function toChordPosition(frets: number[]): ChordPosition {
   const midi = frets
     .map((f, s) => (f >= 0 ? STANDARD_TUNING_MIDI[s] + f : null))
     .filter((m): m is number => m !== null);
   const midiSorted = midi.slice().sort((a, b) => a - b);
+  
+  const { fingers, barres, baseFret } = calculateFingering(frets);
+  
   return {
     frets,
-    fingers: new Array(6).fill(0),
-    baseFret: 1,
-    barres: [],
+    fingers,
+    baseFret,
+    barres,
     midi: uniqSorted(midiSorted),
   };
 }
@@ -382,13 +452,16 @@ export function generateGuitarVoicings(
     })
     .slice(0, maxResults);
 
-  return deduped.map((r) => ({
-    frets: r.frets,
-    fingers: new Array(6).fill(0),
-    baseFret: 1,
-    barres: [],
-    midi: r.midi,
-  }));
+  return deduped.map((r) => {
+    const { fingers, barres, baseFret } = calculateFingering(r.frets);
+    return {
+      frets: r.frets,
+      fingers,
+      baseFret,
+      barres,
+      midi: r.midi,
+    };
+  });
 }
 
 export function pickPracticalVoicings(

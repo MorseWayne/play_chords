@@ -16,6 +16,22 @@ interface VoicingBrowserProps {
   className?: string;
 }
 
+// Get the starting fret position (lowest non-zero fret, or baseFret)
+function getStartingFret(pos: ChordPosition): number {
+  // Use baseFret if available and > 1
+  if (pos.baseFret && pos.baseFret > 1) return pos.baseFret;
+  // Otherwise calculate from frets
+  const positiveFrets = pos.frets.filter((f) => f > 0);
+  if (positiveFrets.length === 0) return 0;
+  return Math.min(...positiveFrets);
+}
+
+// Group positions by their starting fret
+function getUniqueStartingFrets(positions: ChordPosition[]): number[] {
+  const frets = positions.map(getStartingFret);
+  return Array.from(new Set(frets)).sort((a, b) => a - b);
+}
+
 export function VoicingBrowser({
   title,
   root,
@@ -30,6 +46,8 @@ export function VoicingBrowser({
 
   const safeVariant = Math.min(Math.max(0, currentVariant), positions.length - 1);
   const chord = positions[safeVariant];
+  const currentFret = getStartingFret(chord);
+  const uniqueFrets = getUniqueStartingFrets(positions);
 
   return (
     <div className={cn('w-full', className)}>
@@ -40,31 +58,43 @@ export function VoicingBrowser({
             共 {positions.length} 个把位
           </Badge>
         </div>
-        <div className="text-xs text-muted-foreground">当前：{safeVariant + 1}</div>
+        <div className="text-xs text-muted-foreground">当前：{currentFret}</div>
       </div>
 
       <div className="rounded-3xl border bg-muted/10 p-3 md:p-4">
-        <Fretboard fretsLowToHigh={chord.frets} chordRoot={root} maxFret={15} />
+        <Fretboard 
+          fretsLowToHigh={chord.frets} 
+          fingersLowToHigh={chord.fingers}
+          barres={chord.barres}
+          chordRoot={root} 
+          maxFret={15} 
+        />
       </div>
 
       <div className="mt-4 w-full overflow-x-auto">
         <div className="flex min-w-max gap-2 pb-1">
-          {positions.map((_, i) => (
-            <Button
-              key={i}
-              size="sm"
-              variant={i === safeVariant ? 'default' : 'outline'}
-              className={cn('h-9 w-10 rounded-xl', i === safeVariant && 'shadow-sm')}
-              onClick={() => onVariantChange(i)}
-            >
-              {i + 1}
-            </Button>
-          ))}
+          {uniqueFrets.map((fret) => {
+            // Find the first position with this starting fret
+            const posIndex = positions.findIndex((p) => getStartingFret(p) === fret);
+            const isActive = getStartingFret(positions[safeVariant]) === fret;
+            
+            return (
+              <Button
+                key={fret}
+                size="sm"
+                variant={isActive ? 'default' : 'outline'}
+                className={cn('h-9 min-w-[40px] rounded-xl px-3', isActive && 'shadow-sm')}
+                onClick={() => onVariantChange(posIndex)}
+              >
+                {fret === 0 ? '开放' : `${fret}品`}
+              </Button>
+            );
+          })}
         </div>
       </div>
 
       <div className="mt-2 text-xs text-muted-foreground">
-        提示：把位数量来自“指板搜索”，会尽量给出更多可弹的形状（0–15 品范围内）。
+        提示：数字代表起始品位，点击可切换到该品位的把位形状。
       </div>
     </div>
   );

@@ -7,11 +7,6 @@ import { cn } from '@/lib/utils';
 const STRING_LABELS_HIGH_TO_LOW = ['E', 'B', 'G', 'D', 'A', 'E'] as const;
 const STANDARD_TUNING_MIDI_LOW_TO_HIGH = [40, 45, 50, 55, 59, 64];
 
-function midiToPitchClass(midi: number): string {
-  const pcs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  return pcs[((midi % 12) + 12) % 12];
-}
-
 function pitchClassToChroma(pc: string): number {
   const c = Note.chroma(pc);
   return typeof c === 'number' ? c : -1;
@@ -19,12 +14,21 @@ function pitchClassToChroma(pc: string): number {
 
 export interface FretboardProps {
   fretsLowToHigh: number[]; // length 6, low E -> high E, -1 mute, 0 open, >0 fret
+  fingersLowToHigh?: number[]; // length 6, 0 = not pressed/open, 1-4 = finger number
+  barres?: number[]; // fret numbers where barre occurs
   chordRoot?: string; // pitch class (e.g. C, F#, Bb)
   maxFret?: number; // inclusive
   className?: string;
 }
 
-export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }: FretboardProps) {
+export function Fretboard({ 
+  fretsLowToHigh, 
+  fingersLowToHigh = [], 
+  barres = [], 
+  chordRoot, 
+  maxFret = 15, 
+  className 
+}: FretboardProps) {
   const width = 980;
   const height = 260;
   const leftPad = 56; // labels area
@@ -44,12 +48,32 @@ export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }
 
   // Convert to high->low for rendering lines
   const fretsHighToLow = [...fretsLowToHigh].reverse();
+  const fingersHighToLow = fingersLowToHigh.length === 6 ? [...fingersLowToHigh].reverse() : [];
 
   function xForFret(fret: number): number {
     // position inside fret cell (between fret-1 and fret)
     if (fret <= 0) return leftPad + fretGap * 0.35;
     const cellLeft = leftPad + fretGap * fret;
     return cellLeft + fretGap / 2;
+  }
+
+  // Detect barre strings: which strings are covered by the barre
+  function getBarreInfo(barreFret: number): { startString: number; endString: number } | null {
+    // Find the range of strings that should be barred at this fret
+    // Barre covers from the lowest to highest string that uses this fret or higher
+    let startString = -1;
+    let endString = -1;
+    
+    for (let i = 0; i < 6; i++) {
+      const fret = fretsLowToHigh[i];
+      if (fret >= barreFret) {
+        if (startString === -1) startString = i;
+        endString = i;
+      }
+    }
+    
+    if (startString === -1 || startString === endString) return null;
+    return { startString, endString };
   }
 
   return (
@@ -156,11 +180,48 @@ export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }
           );
         })}
 
+        {/* Barre indicators */}
+        {barres.map((barreFret) => {
+          const info = getBarreInfo(barreFret);
+          if (!info) return null;
+          
+          const x = xForFret(barreFret);
+          // Convert from low->high index to high->low for Y position
+          const startY = topPad + stringGap * (5 - info.endString);
+          const endY = topPad + stringGap * (5 - info.startString);
+          
+          return (
+            <g key={`barre-${barreFret}`}>
+              {/* Barre bar background */}
+              <rect
+                x={x - 12}
+                y={startY - 8}
+                width={24}
+                height={endY - startY + 16}
+                rx={10}
+                className="fill-foreground/80"
+              />
+              {/* Finger number for barre (usually 1) */}
+              <text
+                x={x}
+                y={(startY + endY) / 2 + 4}
+                className="fill-background"
+                fontSize="11"
+                fontWeight={700}
+                textAnchor="middle"
+              >
+                1
+              </text>
+            </g>
+          );
+        })}
+
         {/* notes */}
         {fretsHighToLow.map((fret, idxHighToLow) => {
           const y = topPad + stringGap * idxHighToLow;
           const stringIndexLowToHigh = 5 - idxHighToLow;
           const openMidi = STANDARD_TUNING_MIDI_LOW_TO_HIGH[stringIndexLowToHigh];
+          const finger = fingersHighToLow[idxHighToLow] ?? 0;
 
           if (fret < 0) {
             return (
@@ -181,6 +242,14 @@ export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }
           const midi = openMidi + fret;
           const chroma = midi % 12;
           const isRoot = rootChroma >= 0 ? chroma === rootChroma : false;
+
+          // Check if this note is part of a barre (skip individual dot if covered by barre)
+          const isCoveredByBarre = barres.some((barreFret) => {
+            if (fret !== barreFret) return false;
+            const info = getBarreInfo(barreFret);
+            if (!info) return false;
+            return stringIndexLowToHigh >= info.startString && stringIndexLowToHigh <= info.endString;
+          });
 
           // open string: show hollow circle near nut
           if (fret === 0) {
@@ -203,6 +272,9 @@ export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }
             );
           }
 
+          // Skip rendering individual dot if covered by barre
+          if (isCoveredByBarre) return null;
+
           const x = xForFret(fret);
           return (
             <g key={`n-${idxHighToLow}`}>
@@ -222,16 +294,19 @@ export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }
                 className="fill-transparent stroke-background/40"
                 strokeWidth={2}
               />
-              <text
-                x={x}
-                y={y + 4}
-                className={cn(isRoot ? 'fill-primary-foreground' : 'fill-background')}
-                fontSize="10"
-                fontWeight={700}
-                textAnchor="middle"
-              >
-                {midiToPitchClass(midi)}
-              </text>
+              {/* Show finger number if available, otherwise show nothing */}
+              {finger > 0 && (
+                <text
+                  x={x}
+                  y={y + 4}
+                  className={cn(isRoot ? 'fill-primary-foreground' : 'fill-background')}
+                  fontSize="11"
+                  fontWeight={700}
+                  textAnchor="middle"
+                >
+                  {finger}
+                </text>
+              )}
             </g>
           );
         })}
