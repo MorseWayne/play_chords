@@ -5,12 +5,25 @@ import { ChordSelector } from '@/components/ChordSelector';
 import { PlaybackControls } from '@/components/PlaybackControls';
 import { MobileActionBar } from '@/components/MobileActionBar';
 import { VoicingBrowser } from '@/components/VoicingBrowser';
-import { getChordData } from '@/lib/chords';
+import { getChordData, formatSuffix, getSuffixLabel } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Guitar, SlidersHorizontal } from 'lucide-react';
+import { Guitar, SlidersHorizontal, Music, Volume2 } from 'lucide-react';
+import { Chord, Note } from '@tonaljs/tonal';
+
+function suffixToTonalSymbol(suffix: string): string {
+  if (suffix === 'major') return '';
+  if (suffix === 'minor') return 'm';
+  return suffix;
+}
+
+function getChordNotes(key: string, suffix: string): string[] {
+  const tonalSuffix = suffixToTonalSymbol(suffix);
+  const chord = Chord.get(`${key}${tonalSuffix}`);
+  return chord.notes || [];
+}
 
 export default function Home() {
   const [selectedKey, setSelectedKey] = useState('C');
@@ -96,49 +109,61 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6 space-y-4">
-        {/* Controls Row */}
-        <div className="hidden lg:grid lg:grid-cols-2 gap-4">
-          <Card className="rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">选择和弦</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ChordSelector
-                selectedKey={selectedKey}
-                selectedSuffix={selectedSuffix}
-                onKeyChange={handleKeyChange}
-                onSuffixChange={handleSuffixChange}
-              />
-            </CardContent>
+      <main className="mx-auto max-w-6xl px-4 py-4 space-y-3">
+        {/* Controls Row - 3 columns */}
+        <div className="hidden lg:grid lg:grid-cols-[1fr_auto_1fr] gap-3">
+          {/* 选择和弦 */}
+          <Card className="rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
+              <SlidersHorizontal className="h-3 w-3" />
+              选择
+            </div>
+            <ChordSelector
+              selectedKey={selectedKey}
+              selectedSuffix={selectedSuffix}
+              onKeyChange={handleKeyChange}
+              onSuffixChange={handleSuffixChange}
+            />
           </Card>
 
-          <Card className="rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">试听</CardTitle>
-            </CardHeader>
-            <CardContent className="flex justify-center pt-0 pb-4">
-              <PlaybackControls 
-                chord={currentChord}
-              />
-            </CardContent>
+          {/* 和弦信息 */}
+          <Card className="rounded-xl p-3 min-w-[140px]">
+            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium text-muted-foreground">
+              <Music className="h-3 w-3" />
+              和弦
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight">
+                {selectedKey}{formatSuffix(selectedSuffix)}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {getSuffixLabel(selectedSuffix)}
+              </span>
+            </div>
+            <div className="mt-1.5 flex gap-1">
+              {getChordNotes(selectedKey, selectedSuffix).map((note, i) => (
+                <span 
+                  key={i} 
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary/10 px-1.5 text-[10px] font-medium"
+                >
+                  {note}
+                </span>
+              ))}
+            </div>
+          </Card>
+
+          {/* 试听 */}
+          <Card className="rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
+              <Volume2 className="h-3 w-3" />
+              试听
+            </div>
+            <PlaybackControls chord={currentChord} />
           </Card>
         </div>
 
         {/* Fretboard Display - Full Width */}
-        <Card className="rounded-2xl border bg-card/60 supports-[backdrop-filter]:bg-card/50 backdrop-blur p-4 md:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold tracking-tight">
-              {selectedKey}
-              <span className="ml-1.5 text-base font-normal text-muted-foreground">
-                {selectedSuffix === 'major' ? 'Major' : selectedSuffix}
-              </span>
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {totalVariants > 0 ? `${safeVariant + 1} / ${totalVariants}` : ''}
-            </span>
-          </div>
-
+        <Card className="rounded-xl p-4">
           {chordData ? (
             <VoicingBrowser
               root={selectedKey}
@@ -147,7 +172,7 @@ export default function Home() {
               onVariantChange={setCurrentVariant}
             />
           ) : (
-            <div className="text-muted-foreground">暂无数据</div>
+            <div className="text-muted-foreground text-center py-8">暂无数据</div>
           )}
         </Card>
       </main>

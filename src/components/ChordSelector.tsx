@@ -19,44 +19,36 @@ export function ChordSelector({
   const suffixes = getSuffixesForKey(selectedKey);
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
+    <div className="flex gap-2">
       <div className="flex-1">
-        <label className="text-sm font-medium mb-1 block text-muted-foreground">根音 (Root)</label>
+        <label className="text-xs text-muted-foreground mb-1 block">根音</label>
         <Select value={selectedKey} onValueChange={onKeyChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select Key" />
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Key" />
           </SelectTrigger>
           <SelectContent>
             {keys.map((k) => (
-              <SelectItem key={k} value={k}>
-                {k}
-              </SelectItem>
+              <SelectItem key={k} value={k}>{k}</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      <div className="flex-1">
-        <label className="text-sm font-medium mb-1 block text-muted-foreground">类型 (Type)</label>
+      <div className="flex-[2]">
+        <label className="text-xs text-muted-foreground mb-1 block">类型</label>
         <Select value={selectedSuffix} onValueChange={onSuffixChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select Type" />
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
             {suffixes.length > 0 ? (
               suffixes.map((s) => (
                 <SelectItem key={s} value={s}>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="font-medium">
-                      {selectedKey}
-                      <span className="ml-1 text-muted-foreground">{formatSuffix(s)}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{getSuffixLabel(s)}</div>
-                  </div>
+                  {selectedKey}{formatSuffix(s)} <span className="text-muted-foreground ml-1">{getSuffixLabel(s)}</span>
                 </SelectItem>
               ))
             ) : (
-              <SelectItem value="none" disabled>No chords available</SelectItem>
+              <SelectItem value="none" disabled>无可用和弦</SelectItem>
             )}
           </SelectContent>
         </Select>
