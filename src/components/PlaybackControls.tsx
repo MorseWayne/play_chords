@@ -37,41 +37,44 @@ export function PlaybackControls({ chord }: PlaybackControlsProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3 mt-6">
+    <div className="flex flex-col gap-2 w-full">
       {!isReady && (
         <Button
           variant="outline"
+          size="sm"
           onClick={initAudio}
           disabled={state === 'loading'}
-          className="w-64"
+          className="w-full text-xs"
         >
-          {state === 'loading' ? '正在加载真实钢弦吉他音色…' : '加载真实钢弦吉他音色（更逼真）'}
+          {state === 'loading' ? '加载中…' : '加载音色'}
         </Button>
       )}
 
       {state === 'error' && (
-        <div className="text-xs text-destructive">音色加载失败（可能是网络/浏览器策略）。请刷新后重试。</div>
+        <div className="text-[10px] text-destructive">加载失败，请重试</div>
       )}
 
-      <div className="flex gap-4">
-      <Button 
-        onClick={handleStrum} 
-        disabled={!chord || !isReady}
-        className="w-32"
-      >
-        <Music className="mr-2 h-4 w-4" />
-        扫弦 (Strum)
-      </Button>
-      
-      <Button 
-        variant="secondary"
-        onClick={handleArpeggio} 
-        disabled={!chord || !isReady}
-        className="w-32"
-      >
-        <Play className="mr-2 h-4 w-4" />
-        分解 (Arpeggio)
-      </Button>
+      <div className="flex flex-col gap-1.5">
+        <Button 
+          size="sm"
+          onClick={handleStrum} 
+          disabled={!chord || !isReady}
+          className="w-full text-xs"
+        >
+          <Music className="mr-1.5 h-3 w-3" />
+          扫弦
+        </Button>
+        
+        <Button 
+          size="sm"
+          variant="secondary"
+          onClick={handleArpeggio} 
+          disabled={!chord || !isReady}
+          className="w-full text-xs"
+        >
+          <Play className="mr-1.5 h-3 w-3" />
+          分解
+        </Button>
       </div>
     </div>
   );

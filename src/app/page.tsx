@@ -11,19 +11,19 @@ import { Card } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Guitar, SlidersHorizontal, Volume2 } from 'lucide-react';
-import { Chord, Note } from '@tonaljs/tonal';
 import { ChordDiagram } from '@/components/ChordDiagram';
 
-function suffixToTonalSymbol(suffix: string): string {
-  if (suffix === 'major') return '';
-  if (suffix === 'minor') return 'm';
-  return suffix;
-}
+// Standard tuning MIDI notes: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
+const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
+const PITCH_CLASSES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-function getChordNotes(key: string, suffix: string): string[] {
-  const tonalSuffix = suffixToTonalSymbol(suffix);
-  const chord = Chord.get(`${key}${tonalSuffix}`);
-  return chord.notes || [];
+// Get the actual notes played on each string for current voicing
+function getVoicingNotes(frets: number[]): (string | null)[] {
+  return frets.map((fret, stringIndex) => {
+    if (fret < 0) return null; // muted string
+    const midi = STANDARD_TUNING_MIDI[stringIndex] + fret;
+    return PITCH_CLASSES[midi % 12];
+  });
 }
 
 export default function Home() {
@@ -111,61 +111,85 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4 space-y-3">
-        {/* Controls Row - 3 columns */}
-        <div className="hidden lg:grid lg:grid-cols-[1fr_auto_1fr] gap-3">
+        {/* Controls Row - 3 columns aligned */}
+        <div className="hidden lg:grid lg:grid-cols-[180px_1fr_180px] gap-3 items-stretch">
           {/* 选择和弦 */}
-          <Card className="rounded-xl p-3">
+          <Card className="rounded-xl p-3 flex flex-col">
             <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
               <SlidersHorizontal className="h-3 w-3" />
               选择
             </div>
-            <ChordSelector
-              selectedKey={selectedKey}
-              selectedSuffix={selectedSuffix}
-              onKeyChange={handleKeyChange}
-              onSuffixChange={handleSuffixChange}
-            />
+            <div className="flex-1 flex flex-col justify-center">
+              <ChordSelector
+                selectedKey={selectedKey}
+                selectedSuffix={selectedSuffix}
+                onKeyChange={handleKeyChange}
+                onSuffixChange={handleSuffixChange}
+              />
+            </div>
           </Card>
 
-          {/* 和弦图 */}
-          <Card className="rounded-xl p-3 min-w-[160px]">
-            <div className="flex gap-3">
-              {/* 和弦图 */}
+          {/* 和弦指法卡片 */}
+          <Card className="rounded-xl p-3 flex flex-col">
+            <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
+              <Guitar className="h-3 w-3" />
+              指法
+            </div>
+            <div className="flex-1 flex items-center justify-center gap-6">
+              {/* 左侧：和弦图 */}
               {currentChord && (
                 <ChordDiagram
                   frets={currentChord.frets}
                   fingers={currentChord.fingers}
                   barres={currentChord.barres}
                   baseFret={currentChord.baseFret}
-                  chordName={`${selectedKey}${formatSuffix(selectedSuffix)}`}
+                  size="large"
                 />
               )}
-              {/* 和弦信息 */}
-              <div className="flex flex-col justify-center">
-                <div className="text-[10px] text-muted-foreground mb-0.5">
+              
+              {/* 右侧：和弦信息 */}
+              <div className="flex flex-col items-center">
+                {/* 和弦名称 */}
+                <div className="text-4xl font-bold tracking-tight">
+                  {selectedKey}{formatSuffix(selectedSuffix)}
+                </div>
+                <div className="text-sm text-muted-foreground mb-4">
                   {getSuffixLabel(selectedSuffix)}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {getChordNotes(selectedKey, selectedSuffix).map((note, i) => (
-                    <span 
-                      key={i} 
-                      className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary/10 px-1.5 text-[10px] font-medium"
-                    >
-                      {note}
-                    </span>
-                  ))}
-                </div>
+                
+                {/* 每根弦的音符 */}
+                {currentChord && (
+                  <div className="flex flex-col items-center">
+                    <div className="flex gap-1.5">
+                      {getVoicingNotes(currentChord.frets).map((note, i) => (
+                        <span 
+                          key={i} 
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold ${
+                            note ? 'bg-primary/15 text-foreground' : 'bg-muted/40 text-muted-foreground'
+                          }`}
+                        >
+                          {note || '×'}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2 tracking-[0.2em]">
+                      E  A  D  G  B  E
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
 
           {/* 试听 */}
-          <Card className="rounded-xl p-3">
+          <Card className="rounded-xl p-3 flex flex-col">
             <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
               <Volume2 className="h-3 w-3" />
               试听
             </div>
-            <PlaybackControls chord={currentChord} />
+            <div className="flex-1 flex flex-col justify-center">
+              <PlaybackControls chord={currentChord} />
+            </div>
           </Card>
         </div>
 

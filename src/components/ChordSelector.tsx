@@ -19,11 +19,11 @@ export function ChordSelector({
   const suffixes = getSuffixesForKey(selectedKey);
 
   return (
-    <div className="flex gap-2">
-      <div className="flex-1">
-        <label className="text-xs text-muted-foreground mb-1 block">根音</label>
+    <div className="flex flex-col gap-2 w-full">
+      <div>
+        <label className="text-[10px] text-muted-foreground mb-0.5 block">根音</label>
         <Select value={selectedKey} onValueChange={onKeyChange}>
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-8 text-sm">
             <SelectValue placeholder="Key" />
           </SelectTrigger>
           <SelectContent>
@@ -34,17 +34,17 @@ export function ChordSelector({
         </Select>
       </div>
 
-      <div className="flex-[2]">
-        <label className="text-xs text-muted-foreground mb-1 block">类型</label>
+      <div>
+        <label className="text-[10px] text-muted-foreground mb-0.5 block">类型</label>
         <Select value={selectedSuffix} onValueChange={onSuffixChange}>
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-8 text-sm">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
             {suffixes.length > 0 ? (
               suffixes.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {selectedKey}{formatSuffix(s)} <span className="text-muted-foreground ml-1">{getSuffixLabel(s)}</span>
+                  {selectedKey}{formatSuffix(s)} <span className="text-muted-foreground ml-1 text-xs">{getSuffixLabel(s)}</span>
                 </SelectItem>
               ))
             ) : (

@@ -9,6 +9,7 @@ interface ChordDiagramProps {
   barres?: number[]; // fret numbers where barre occurs
   baseFret?: number; // starting fret position
   chordName?: string; // chord name to display
+  size?: 'small' | 'large'; // size variant
   className?: string;
 }
 
@@ -18,20 +19,32 @@ export function ChordDiagram({
   barres = [],
   baseFret = 1,
   chordName,
+  size = 'small',
   className,
 }: ChordDiagramProps) {
-  const width = 80;
-  const height = 100;
+  // Size configurations
+  const isLarge = size === 'large';
+  const width = isLarge ? 120 : 80;
+  const height = isLarge ? 150 : 100;
   const stringCount = 6;
   const fretCount = 4; // show 4 frets
   
-  const topPad = 20; // for open/mute markers
-  const bottomPad = 6;
-  const leftPad = 10;
-  const rightPad = 10;
+  const topPad = isLarge ? 28 : 20; // for open/mute markers
+  const bottomPad = isLarge ? 10 : 6;
+  const leftPad = isLarge ? 16 : 10;
+  const rightPad = isLarge ? 16 : 10;
   
   const boardWidth = width - leftPad - rightPad;
   const boardHeight = height - topPad - bottomPad;
+  
+  // Size-dependent values
+  const dotRadius = isLarge ? 9 : 6;
+  const openCircleRadius = isLarge ? 6 : 4;
+  const fontSize = isLarge ? 12 : 8;
+  const baseFretFontSize = isLarge ? 12 : 9;
+  const muteFontSize = isLarge ? 14 : 10;
+  const barreHeight = isLarge ? 14 : 10;
+  const maxWidth = isLarge ? 120 : 80;
   
   const stringGap = boardWidth / (stringCount - 1);
   const fretGap = boardHeight / fretCount;
@@ -77,7 +90,7 @@ export function ChordDiagram({
       )}
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full max-w-[80px]"
+        className={cn('w-full', isLarge ? 'max-w-[120px]' : 'max-w-[80px]')}
         role="img"
         aria-label="和弦图"
       >
@@ -85,18 +98,18 @@ export function ChordDiagram({
         {!showBaseFret ? (
           <rect
             x={leftPad - 2}
-            y={topPad - 3}
+            y={topPad - (isLarge ? 4 : 3)}
             width={boardWidth + 4}
-            height={4}
-            rx={1}
+            height={isLarge ? 5 : 4}
+            rx={isLarge ? 2 : 1}
             className="fill-foreground"
           />
         ) : (
           <text
-            x={4}
+            x={isLarge ? 2 : 4}
             y={topPad + fretGap * 0.5 + 4}
             className="fill-muted-foreground"
-            fontSize="9"
+            fontSize={baseFretFontSize}
             fontWeight={600}
           >
             {actualBaseFret}
@@ -137,15 +150,16 @@ export function ChordDiagram({
           const y = yForFret(barreFret);
           const startX = xForString(info.startString);
           const endX = xForString(info.endString);
+          const barreHalf = barreHeight / 2;
           
           return (
             <rect
               key={`barre-${barreFret}`}
-              x={startX - 4}
-              y={y - 5}
-              width={endX - startX + 8}
-              height={10}
-              rx={5}
+              x={startX - (isLarge ? 6 : 4)}
+              y={y - barreHalf}
+              width={endX - startX + (isLarge ? 12 : 8)}
+              height={barreHeight}
+              rx={barreHalf}
               className="fill-foreground"
             />
           );
@@ -161,9 +175,9 @@ export function ChordDiagram({
               <text
                 key={`mute-${stringIndex}`}
                 x={x}
-                y={topPad - 6}
+                y={topPad - (isLarge ? 8 : 6)}
                 className="fill-muted-foreground"
-                fontSize="10"
+                fontSize={muteFontSize}
                 fontWeight={600}
                 textAnchor="middle"
               >
@@ -178,10 +192,10 @@ export function ChordDiagram({
               <circle
                 key={`open-${stringIndex}`}
                 cx={x}
-                cy={topPad - 9}
-                r={4}
+                cy={topPad - (isLarge ? 13 : 9)}
+                r={openCircleRadius}
                 className="fill-none stroke-muted-foreground"
-                strokeWidth={1.5}
+                strokeWidth={isLarge ? 2 : 1.5}
               />
             );
           }
@@ -205,15 +219,15 @@ export function ChordDiagram({
               <circle
                 cx={x}
                 cy={y}
-                r={6}
+                r={dotRadius}
                 className="fill-foreground"
               />
               {finger > 0 && (
                 <text
                   x={x}
-                  y={y + 3}
+                  y={y + (isLarge ? 4 : 3)}
                   className="fill-background"
-                  fontSize="8"
+                  fontSize={fontSize}
                   fontWeight={700}
                   textAnchor="middle"
                 >
