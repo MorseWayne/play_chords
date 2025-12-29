@@ -2,13 +2,11 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ChordPosition } from '@/lib/chords';
 import { Fretboard } from '@/components/Fretboard';
 import { cn } from '@/lib/utils';
 
 interface VoicingBrowserProps {
-  title?: string;
   root: string;
   positions: ChordPosition[];
   currentVariant: number;
@@ -33,7 +31,6 @@ function getUniqueStartingFrets(positions: ChordPosition[]): number[] {
 }
 
 export function VoicingBrowser({
-  title,
   root,
   positions,
   currentVariant,
@@ -51,14 +48,9 @@ export function VoicingBrowser({
 
   return (
     <div className={cn('w-full', className)}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {title && <div className="text-sm font-medium">{title}</div>}
-          <Badge variant="secondary" className="rounded-full">
-            共 {positions.length} 个把位
-          </Badge>
-        </div>
-        <div className="text-xs text-muted-foreground">当前：{currentFret}</div>
+      <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+        <span>{positions.length} 个把位</span>
+        <span>{currentFret === 0 ? '开放把位' : `${currentFret}品起`}</span>
       </div>
 
       <div className="rounded-3xl border bg-muted/10 p-3 md:p-4">
@@ -93,9 +85,6 @@ export function VoicingBrowser({
         </div>
       </div>
 
-      <div className="mt-2 text-xs text-muted-foreground">
-        提示：数字代表起始品位，点击可切换到该品位的把位形状。
-      </div>
     </div>
   );
 }

@@ -7,11 +7,10 @@ import { MobileActionBar } from '@/components/MobileActionBar';
 import { VoicingBrowser } from '@/components/VoicingBrowser';
 import { getChordData } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
-import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Guitar, Music4, SlidersHorizontal } from 'lucide-react';
+import { Guitar, SlidersHorizontal } from 'lucide-react';
 
 export default function Home() {
   const [selectedKey, setSelectedKey] = useState('C');
@@ -78,20 +77,17 @@ export default function Home() {
                   和弦
                 </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[340px] sm:w-[380px]">
+              <SheetContent side="left" className="w-[300px] sm:w-[340px]">
                 <SheetHeader>
                   <SheetTitle>选择和弦</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6">
+                <div className="mt-4">
                   <ChordSelector
                     selectedKey={selectedKey}
                     selectedSuffix={selectedSuffix}
                     onKeyChange={handleKeyChange}
                     onSuffixChange={handleSuffixChange}
                   />
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  提示：你可以在右侧查看不同把位，并在下方试听扫弦/分解。
                 </div>
               </SheetContent>
             </Sheet>
@@ -100,106 +96,60 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        {/* Hero */}
-        <div className="mb-8 rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-full">
-                <Music4 className="h-3.5 w-3.5" />
-                  钢弦采样音色
-                </Badge>
-                <Badge variant="outline" className="rounded-full">
-                  支持暗色模式
-                </Badge>
-              </div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                练和弦更顺手：<span className="text-primary">选</span>、<span className="text-primary">看</span>、<span className="text-primary">听</span>
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                用最短路径找到和弦指法与把位，并用更逼真的钢弦采样试听扫弦与分解。后续可扩展：转调、节奏型、练习计划。
-              </p>
-            </div>
-          </div>
+      <main className="mx-auto max-w-4xl px-4 py-6 space-y-4">
+        {/* Controls Row */}
+        <div className="hidden lg:grid lg:grid-cols-2 gap-4">
+          <Card className="rounded-2xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">选择和弦</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ChordSelector
+                selectedKey={selectedKey}
+                selectedSuffix={selectedSuffix}
+                onKeyChange={handleKeyChange}
+                onSuffixChange={handleSuffixChange}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">试听</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center pt-0 pb-4">
+              <PlaybackControls 
+                chord={currentChord}
+              />
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
-          
-          {/* Left Column: Controls */}
-          <div className="hidden lg:block space-y-6">
-            <Card className="rounded-3xl">
-              <CardHeader>
-                <CardTitle>选择和弦 (Select Chord)</CardTitle>
-                <CardDescription>
-                  选择根音和和弦类型来查看指法。
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChordSelector
-                  selectedKey={selectedKey}
-                  selectedSuffix={selectedSuffix}
-                  onKeyChange={handleKeyChange}
-                  onSuffixChange={handleSuffixChange}
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-3xl">
-              <CardHeader>
-                <CardTitle>播放控制 (Playback)</CardTitle>
-                <CardDescription>
-                  试听当前和弦的声音。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex justify-center pb-6">
-                <PlaybackControls 
-                  chord={currentChord}
-                />
-              </CardContent>
-            </Card>
+        {/* Fretboard Display - Full Width */}
+        <Card className="rounded-2xl border bg-card/60 supports-[backdrop-filter]:bg-card/50 backdrop-blur p-4 md:p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {selectedKey}
+              <span className="ml-1.5 text-base font-normal text-muted-foreground">
+                {selectedSuffix === 'major' ? 'Major' : selectedSuffix}
+              </span>
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {totalVariants > 0 ? `${safeVariant + 1} / ${totalVariants}` : ''}
+            </span>
           </div>
 
-          {/* Right Column: Display */}
-          <div className="flex flex-col items-center">
-            <div className="w-full">
-               <Card className="h-full min-h-[540px] rounded-3xl border bg-card/60 supports-[backdrop-filter]:bg-card/50 backdrop-blur p-6 md:p-10">
-                  <div className="mb-8 flex flex-col items-center text-center">
-                    <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                      当前和弦
-                    </div>
-                    <h2 className="mt-4 text-4xl font-semibold tracking-tight">
-                      {selectedKey}
-                      <span className="ml-2 align-middle text-lg font-normal text-muted-foreground">
-                        {selectedSuffix === 'major' ? 'Major' : selectedSuffix}
-                      </span>
-                    </h2>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {chordData?.positions ? `把位 ${currentVariant + 1} / ${chordData.positions.length}` : ''}
-                    </p>
-                  </div>
-
-                  {chordData ? (
-                    <div className="flex flex-col items-center">
-                      <VoicingBrowser
-                        title="指板把位"
-                        root={selectedKey}
-                        positions={activePositions}
-                        currentVariant={safeVariant}
-                        onVariantChange={setCurrentVariant}
-                      />
-                      <div className="mt-6 text-center text-xs text-muted-foreground">
-                        提示：先点“加载真实钢弦吉他音色”，再试听会更接近真实吉他。
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground">No chord data found</div>
-                  )}
-               </Card>
-            </div>
-          </div>
-
-        </div>
+          {chordData ? (
+            <VoicingBrowser
+              root={selectedKey}
+              positions={activePositions}
+              currentVariant={safeVariant}
+              onVariantChange={setCurrentVariant}
+            />
+          ) : (
+            <div className="text-muted-foreground">暂无数据</div>
+          )}
+        </Card>
       </main>
 
       {/* Mobile fixed action bar */}

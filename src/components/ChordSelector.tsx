@@ -19,7 +19,7 @@ export function ChordSelector({
   const suffixes = getSuffixesForKey(selectedKey);
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+    <div className="flex flex-col sm:flex-row gap-3">
       <div className="flex-1">
         <label className="text-sm font-medium mb-1 block text-muted-foreground">根音 (Root)</label>
         <Select value={selectedKey} onValueChange={onKeyChange}>
