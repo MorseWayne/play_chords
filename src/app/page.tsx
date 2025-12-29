@@ -10,8 +10,9 @@ import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
 import { Card } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Guitar, SlidersHorizontal, Music, Volume2 } from 'lucide-react';
+import { Guitar, SlidersHorizontal, Volume2 } from 'lucide-react';
 import { Chord, Note } from '@tonaljs/tonal';
+import { ChordDiagram } from '@/components/ChordDiagram';
 
 function suffixToTonalSymbol(suffix: string): string {
   if (suffix === 'major') return '';
@@ -126,29 +127,35 @@ export default function Home() {
             />
           </Card>
 
-          {/* 和弦信息 */}
-          <Card className="rounded-xl p-3 min-w-[140px]">
-            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium text-muted-foreground">
-              <Music className="h-3 w-3" />
-              和弦
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight">
-                {selectedKey}{formatSuffix(selectedSuffix)}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {getSuffixLabel(selectedSuffix)}
-              </span>
-            </div>
-            <div className="mt-1.5 flex gap-1">
-              {getChordNotes(selectedKey, selectedSuffix).map((note, i) => (
-                <span 
-                  key={i} 
-                  className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary/10 px-1.5 text-[10px] font-medium"
-                >
-                  {note}
-                </span>
-              ))}
+          {/* 和弦图 */}
+          <Card className="rounded-xl p-3 min-w-[160px]">
+            <div className="flex gap-3">
+              {/* 和弦图 */}
+              {currentChord && (
+                <ChordDiagram
+                  frets={currentChord.frets}
+                  fingers={currentChord.fingers}
+                  barres={currentChord.barres}
+                  baseFret={currentChord.baseFret}
+                  chordName={`${selectedKey}${formatSuffix(selectedSuffix)}`}
+                />
+              )}
+              {/* 和弦信息 */}
+              <div className="flex flex-col justify-center">
+                <div className="text-[10px] text-muted-foreground mb-0.5">
+                  {getSuffixLabel(selectedSuffix)}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {getChordNotes(selectedKey, selectedSuffix).map((note, i) => (
+                    <span 
+                      key={i} 
+                      className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary/10 px-1.5 text-[10px] font-medium"
+                    >
+                      {note}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </Card>
 
