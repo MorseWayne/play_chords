@@ -30,7 +30,7 @@ export function ChordDisplay({
   
   const instrument = {
     strings: 6,
-    fretsOnChord: 4,
+    fretsOnChord: 5,
     name: 'Guitar',
     keys: [],
     tunings: {

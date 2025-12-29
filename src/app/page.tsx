@@ -2,10 +2,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { ChordSelector } from '@/components/ChordSelector';
-import { ChordDisplay } from '@/components/ChordDisplay';
 import { PlaybackControls } from '@/components/PlaybackControls';
 import { MobileActionBar } from '@/components/MobileActionBar';
+import { VoicingBrowser } from '@/components/VoicingBrowser';
 import { getChordData } from '@/lib/chords';
+import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Badge } from '@/components/ui/badge';
@@ -21,10 +22,25 @@ export default function Home() {
     return getChordData(selectedKey, selectedSuffix);
   }, [selectedKey, selectedSuffix]);
 
-  const totalVariants = chordData?.positions?.length ?? 0;
+  const generatedPositions = useMemo(() => {
+    // Generate more voicings than the static DB provides (0-15 fret search)
+    return generateGuitarVoicings(selectedKey, selectedSuffix, { maxFret: 12, maxSpan: 5, maxResults: 30 });
+  }, [selectedKey, selectedSuffix]);
+
+  const activePositions = useMemo(() => {
+    // “常用把位优先”：先用 chords-db 的经典指法，再用生成器补齐，但只保留更实用的少量把位
+    return pickPracticalVoicings(
+      selectedKey,
+      selectedSuffix,
+      chordData?.positions ?? [],
+      generatedPositions,
+      { limit: 10 },
+    );
+  }, [selectedKey, selectedSuffix, chordData, generatedPositions]);
+  const totalVariants = activePositions.length ?? 0;
   const safeVariant =
     totalVariants > 0 ? Math.min(Math.max(0, currentVariant), totalVariants - 1) : 0;
-  const currentChord = chordData?.positions?.[safeVariant] ?? null;
+  const currentChord = activePositions?.[safeVariant] ?? null;
 
   const handleKeyChange = (key: string) => {
     setSelectedKey(key);
@@ -165,8 +181,10 @@ export default function Home() {
 
                   {chordData ? (
                     <div className="flex flex-col items-center">
-                      <ChordDisplay
-                        positions={chordData.positions}
+                      <VoicingBrowser
+                        title="指板把位"
+                        root={selectedKey}
+                        positions={activePositions}
                         currentVariant={safeVariant}
                         onVariantChange={setCurrentVariant}
                       />
