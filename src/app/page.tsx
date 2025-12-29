@@ -7,7 +7,9 @@ import { PlaybackControls } from '@/components/PlaybackControls';
 import { getChordData } from '@/lib/chords';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
-import { Guitar, Music4 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Guitar, Music4, SlidersHorizontal } from 'lucide-react';
 
 export default function Home() {
   const [selectedKey, setSelectedKey] = useState('C');
@@ -44,6 +46,33 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  className="lg:hidden inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-sm text-foreground shadow-sm hover:bg-accent"
+                  type="button"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  和弦
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[340px] sm:w-[380px]">
+                <SheetHeader>
+                  <SheetTitle>选择和弦</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <ChordSelector
+                    selectedKey={selectedKey}
+                    selectedSuffix={selectedSuffix}
+                    onKeyChange={handleKeyChange}
+                    onSuffixChange={handleSuffixChange}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  提示：你可以在右侧查看不同把位，并在下方试听扫弦/分解。
+                </div>
+              </SheetContent>
+            </Sheet>
             <ModeToggle />
           </div>
         </div>
@@ -54,9 +83,14 @@ export default function Home() {
         <div className="mb-8 rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
           <div className="flex items-start justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="rounded-full">
                 <Music4 className="h-3.5 w-3.5" />
-                钢弦采样音色 · 支持暗色模式
+                  钢弦采样音色
+                </Badge>
+                <Badge variant="outline" className="rounded-full">
+                  支持暗色模式
+                </Badge>
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
                 练和弦更顺手：<span className="text-primary">选</span>、<span className="text-primary">看</span>、<span className="text-primary">听</span>
@@ -71,7 +105,7 @@ export default function Home() {
         <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
           
           {/* Left Column: Controls */}
-          <div className="space-y-6">
+          <div className="hidden lg:block space-y-6">
             <Card className="rounded-3xl">
               <CardHeader>
                 <CardTitle>选择和弦 (Select Chord)</CardTitle>
@@ -138,6 +172,21 @@ export default function Home() {
                     <div className="text-muted-foreground">No chord data found</div>
                   )}
                </Card>
+            </div>
+
+            {/* Mobile playback card */}
+            <div className="mt-6 w-full lg:hidden">
+              <Card className="rounded-3xl">
+                <CardHeader>
+                  <CardTitle>播放控制</CardTitle>
+                  <CardDescription>移动端把和弦选择收进抽屉了，试听在这里。</CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center pb-6">
+                  <PlaybackControls
+                    chord={chordData && chordData.positions ? chordData.positions[currentVariant] : null}
+                  />
+                </CardContent>
+              </Card>
             </div>
           </div>
 

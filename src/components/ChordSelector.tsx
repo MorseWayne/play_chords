@@ -1,6 +1,6 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getAvailableKeys, getSuffixesForKey, formatSuffix } from '@/lib/chords';
+import { getAvailableKeys, getSuffixesForKey, formatSuffix, getSuffixLabel } from '@/lib/chords';
 
 interface ChordSelectorProps {
   selectedKey: string;
@@ -46,7 +46,13 @@ export function ChordSelector({
             {suffixes.length > 0 ? (
               suffixes.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {selectedKey} {formatSuffix(s)} ({s})
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="font-medium">
+                      {selectedKey}
+                      <span className="ml-1 text-muted-foreground">{formatSuffix(s)}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{getSuffixLabel(s)}</div>
+                  </div>
                 </SelectItem>
               ))
             ) : (

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Music } from 'lucide-react';
 import { ChordPosition } from '@/lib/chords';
 import { useAudio } from '@/hooks/useAudio';
+import { toast } from 'sonner';
 
 interface PlaybackControlsProps {
   chord: ChordPosition | null;
@@ -10,6 +11,18 @@ interface PlaybackControlsProps {
 
 export function PlaybackControls({ chord }: PlaybackControlsProps) {
   const { playStrum, playArpeggio, initAudio, isReady, state } = useAudio();
+  const lastStateRef = React.useRef(state);
+
+  React.useEffect(() => {
+    if (lastStateRef.current === state) return;
+    lastStateRef.current = state;
+    if (state === 'ready') {
+      toast.success('钢弦吉他音色已就绪');
+    }
+    if (state === 'error') {
+      toast.error('音色加载失败，请稍后重试');
+    }
+  }, [state]);
 
   const handleStrum = () => {
     if (chord && chord.midi) {
@@ -37,9 +50,7 @@ export function PlaybackControls({ chord }: PlaybackControlsProps) {
       )}
 
       {state === 'error' && (
-        <div className="text-xs text-destructive">
-          音色加载失败（可能是网络/浏览器策略）。你可以刷新后重试，或稍后我帮你改成本地音源包。
-        </div>
+        <div className="text-xs text-destructive">音色加载失败（可能是网络/浏览器策略）。请刷新后重试。</div>
       )}
 
       <div className="flex gap-4">
