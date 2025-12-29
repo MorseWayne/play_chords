@@ -48,9 +48,9 @@ export function ChordDisplay({
 
   return (
     <div className="flex flex-col items-center">
-      <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+      <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border mb-4">
         {/* React Chords renders an SVG */}
-        <div className="w-64 h-72">
+        <div className="w-64 h-72 dark:[&_svg]:invert dark:[&_svg]:hue-rotate-180 dark:[&_svg]:contrast-125">
             <Chord
                 chord={liteChord}
                 instrument={instrument}
