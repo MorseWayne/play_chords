@@ -1,0 +1,6 @@
+# Cursor AI 规则配置
+
+## Git Commit Message 规则
+- 生成 commit message 时必须使用中文
+- commit message 应该清晰描述本次提交的内容
+- 遵循约定式提交规范，但使用中文描述
