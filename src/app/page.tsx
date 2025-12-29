@@ -24,7 +24,7 @@ export default function Home() {
 
   const generatedPositions = useMemo(() => {
     // Generate more voicings than the static DB provides (0-15 fret search)
-    return generateGuitarVoicings(selectedKey, selectedSuffix, { maxFret: 12, maxSpan: 5, maxResults: 30 });
+    return generateGuitarVoicings(selectedKey, selectedSuffix, { maxFret: 15, maxSpan: 5, maxResults: 40 });
   }, [selectedKey, selectedSuffix]);
 
   const activePositions = useMemo(() => {
@@ -34,7 +34,7 @@ export default function Home() {
       selectedSuffix,
       chordData?.positions ?? [],
       generatedPositions,
-      { limit: 10 },
+      { limit: 10, maxFret: 15 },
     );
   }, [selectedKey, selectedSuffix, chordData, generatedPositions]);
   const totalVariants = activePositions.length ?? 0;

@@ -32,6 +32,7 @@ export interface GenerateVoicingsOptions {
 
 export interface PickPracticalOptions {
   limit?: number;
+  maxFret?: number;
 }
 
 function countGapsBetweenSoundingStrings(fretsLowToHigh: number[]): number {
@@ -50,6 +51,128 @@ function countGapsBetweenSoundingStrings(fretsLowToHigh: number[]): number {
     }
   }
   return gaps;
+}
+
+function mod12(n: number): number {
+  return ((n % 12) + 12) % 12;
+}
+
+function rootFretsForString(openMidi: number, rootChroma: number, maxFret: number): number[] {
+  const openChroma = mod12(openMidi);
+  const base = mod12(rootChroma - openChroma); // 0..11
+  const frets: number[] = [];
+  for (let f = base; f <= maxFret; f += 12) {
+    if (f > 0) frets.push(f); // barre implies non-open
+  }
+  return frets;
+}
+
+function toChordPosition(frets: number[]): ChordPosition {
+  const midi = frets
+    .map((f, s) => (f >= 0 ? STANDARD_TUNING_MIDI[s] + f : null))
+    .filter((m): m is number => m !== null);
+  const midiSorted = midi.slice().sort((a, b) => a - b);
+  return {
+    frets,
+    fingers: new Array(6).fill(0),
+    baseFret: 1,
+    barres: [],
+    midi: uniqSorted(midiSorted),
+  };
+}
+
+function generateCommonBarreVoicings(key: string, suffix: string, maxFret: number): ChordPosition[] {
+  const rootChroma = Note.chroma(key);
+  if (rootChroma < 0) return [];
+
+  const tonalSuffix = suffixToTonalSymbol(suffix);
+  const chord = Chord.get(`${key}${tonalSuffix}`);
+  if (chord.empty) return [];
+
+  const supported = new Set(['', 'm', '7', 'm7', 'maj7', 'sus4', 'sus2']);
+  if (!supported.has(tonalSuffix)) return [];
+
+  const positions: ChordPosition[] = [];
+
+  // E-shape (root on low E string)
+  // Major:  [f, f+2, f+2, f+1, f, f]
+  // Minor:  [f, f+2, f+2, f,   f, f]
+  // 7:      [f, f+2, f,   f+1, f, f]
+  // m7:     [f, f+2, f,   f,   f, f]
+  // maj7:   [f, f+2, f+1, f+1, f, f]
+  // sus4:   [f, f+2, f+2, f+2, f, f]
+  // sus2:   [f, f+2, f+4, f+4, f, f] (common alt; still playable)
+  const eRoots = rootFretsForString(STANDARD_TUNING_MIDI[0], rootChroma, maxFret);
+  for (const f of eRoots) {
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [f, f + 2, f + 2, f + 1, f, f];
+        case 'm':
+          return [f, f + 2, f + 2, f, f, f];
+        case '7':
+          return [f, f + 2, f, f + 1, f, f];
+        case 'm7':
+          return [f, f + 2, f, f, f, f];
+        case 'maj7':
+          return [f, f + 2, f + 1, f + 1, f, f];
+        case 'sus4':
+          return [f, f + 2, f + 2, f + 2, f, f];
+        case 'sus2':
+          return [f, f + 2, f + 4, f + 4, f, f];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x > maxFret)) continue;
+    positions.push(toChordPosition(shape));
+  }
+
+  // A-shape (root on A string)
+  // Major: [-1, f, f+2, f+2, f+2, f]
+  // Minor: [-1, f, f+2, f+2, f+1, f]
+  // 7:     [-1, f, f+2, f,   f+2, f]
+  // m7:    [-1, f, f+2, f,   f+1, f]
+  // maj7:  [-1, f, f+2, f+1, f+2, f]
+  // sus4:  [-1, f, f+2, f+2, f+3, f]
+  // sus2:  [-1, f, f+2, f+2, f,   f]
+  const aRoots = rootFretsForString(STANDARD_TUNING_MIDI[1], rootChroma, maxFret);
+  for (const f of aRoots) {
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [-1, f, f + 2, f + 2, f + 2, f];
+        case 'm':
+          return [-1, f, f + 2, f + 2, f + 1, f];
+        case '7':
+          return [-1, f, f + 2, f, f + 2, f];
+        case 'm7':
+          return [-1, f, f + 2, f, f + 1, f];
+        case 'maj7':
+          return [-1, f, f + 2, f + 1, f + 2, f];
+        case 'sus4':
+          return [-1, f, f + 2, f + 2, f + 3, f];
+        case 'sus2':
+          return [-1, f, f + 2, f + 2, f, f];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x > maxFret)) continue;
+    // Avoid the very low A-shape at f=1 that collides with open-ish shapes; keep but score will decide.
+    positions.push(toChordPosition(shape));
+  }
+
+  // De-dupe by fret pattern
+  const seen = new Set<string>();
+  return positions.filter((p) => {
+    const k = p.frets.join(',');
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 function practicalScore(params: {
@@ -109,6 +232,11 @@ function practicalScore(params: {
 
   const gaps = countGapsBetweenSoundingStrings(frets);
 
+  // Detect barre-like shape (many strings on the same fret and no open strings)
+  const minPos = positiveFrets.length ? Math.min(...positiveFrets) : 0;
+  const barreCount = frets.filter((f) => f === minPos).length;
+  const barreLike = minPos > 0 && barreCount >= 3 && opens === 0;
+
   // Strongly prefer low position & compact, few mutes, no weird gaps.
   // Also prefer root in bass.
   const score =
@@ -116,11 +244,12 @@ function practicalScore(params: {
     gaps * 12 +
     mutes * 10 +
     avgFret * 1.2 +
-    maxFretUsed * 0.8 +
-    (maxFretUsed > 7 ? 30 : 0) +
-    (maxFretUsed > 10 ? 60 : 0) +
+    maxFretUsed * 0.6 +
+    (maxFretUsed > 7 ? 14 : 0) +
+    (maxFretUsed > 10 ? 28 : 0) +
     (bassIsRoot ? 0 : 18) +
-    opens * -2;
+    opens * -2 +
+    (barreLike ? -10 : 0);
 
   return score;
 }
@@ -270,6 +399,7 @@ export function pickPracticalVoicings(
   options: PickPracticalOptions = {},
 ): ChordPosition[] {
   const limit = options.limit ?? 10;
+  const maxFret = options.maxFret ?? 15;
 
   const chordSymbol = `${key}${suffixToTonalSymbol(suffix)}`;
   const chord = Chord.get(chordSymbol);
@@ -283,7 +413,7 @@ export function pickPracticalVoicings(
   type Scored = { pos: ChordPosition; score: number; src: 'db' | 'gen' };
   const scored: Scored[] = [];
 
-  const add = (pos: ChordPosition, src: 'db' | 'gen') => {
+  const add = (pos: ChordPosition, src: 'db' | 'gen', bonus = 0) => {
     const score = practicalScore({
       frets: pos.frets,
       chordChromas,
@@ -292,23 +422,57 @@ export function pickPracticalVoicings(
     });
     if (!Number.isFinite(score)) return;
     // Prefer DB shapes slightly when scores are close
-    scored.push({ pos, score: score + (src === 'db' ? -6 : 0), src });
+    scored.push({ pos, score: score + (src === 'db' ? -6 : 0) + bonus, src });
   };
 
+  const barre = generateCommonBarreVoicings(key, suffix, maxFret);
+
   fromDb.forEach((p) => add(p, 'db'));
+  // Strongly prefer classic barre shapes when they exist
+  barre.forEach((p) => add(p, 'gen', -8));
   generated.forEach((p) => add(p, 'gen'));
 
   const seen = new Set<string>();
-  return scored
+  const sorted = scored
     .sort((a, b) => a.score - b.score)
     .filter((s) => {
       const k = s.pos.frets.join(',');
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
-    })
-    .slice(0, limit)
-    .map((s) => s.pos);
+    });
+
+  // Bucket selection: ensure we keep some higher-position barres if available
+  const low: ChordPosition[] = [];
+  const mid: ChordPosition[] = [];
+  const high: ChordPosition[] = [];
+
+  for (const s of sorted) {
+    const maxFretUsed = Math.max(...s.pos.frets.filter((f) => f > 0), 0);
+    if (maxFretUsed <= 4) low.push(s.pos);
+    else if (maxFretUsed <= 8) mid.push(s.pos);
+    else high.push(s.pos);
+  }
+
+  const pick: ChordPosition[] = [];
+  const quotaLow = Math.min(4, limit);
+  const quotaMid = Math.min(3, Math.max(0, limit - quotaLow));
+  const quotaHigh = Math.max(0, limit - quotaLow - quotaMid);
+
+  pick.push(...low.slice(0, quotaLow));
+  pick.push(...mid.slice(0, quotaMid));
+  pick.push(...high.slice(0, quotaHigh));
+
+  if (pick.length < limit) {
+    const rest = [...low.slice(quotaLow), ...mid.slice(quotaMid), ...high.slice(quotaHigh)];
+    for (const p of rest) {
+      if (pick.length >= limit) break;
+      // de-dupe again
+      if (!pick.find((x) => x.frets.join(',') === p.frets.join(','))) pick.push(p);
+    }
+  }
+
+  return pick.slice(0, limit);
 }
 
 
