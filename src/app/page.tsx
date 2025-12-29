@@ -17,12 +17,14 @@ import { ChordDiagram } from '@/components/ChordDiagram';
 const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
 const PITCH_CLASSES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-// Get the actual notes played on each string for current voicing
-function getVoicingNotes(frets: number[]): (string | null)[] {
+// Get the actual notes with octave played on each string for current voicing
+function getVoicingNotesWithOctave(frets: number[]): (string | null)[] {
   return frets.map((fret, stringIndex) => {
     if (fret < 0) return null; // muted string
     const midi = STANDARD_TUNING_MIDI[stringIndex] + fret;
-    return PITCH_CLASSES[midi % 12];
+    const pitchClass = PITCH_CLASSES[midi % 12];
+    const octave = Math.floor(midi / 12) - 1; // MIDI 60 = C4
+    return `${pitchClass}${octave}`;
   });
 }
 
@@ -161,7 +163,7 @@ export default function Home() {
                 {currentChord && (
                   <div className="flex flex-col items-center">
                     <div className="flex gap-1.5">
-                      {getVoicingNotes(currentChord.frets).map((note, i) => (
+                      {getVoicingNotesWithOctave(currentChord.frets).map((note, i) => (
                         <span 
                           key={i} 
                           className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold ${
