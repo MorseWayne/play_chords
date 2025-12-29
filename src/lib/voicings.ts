@@ -159,7 +159,7 @@ function generateCommonBarreVoicings(key: string, suffix: string, maxFret: numbe
   const chord = Chord.get(`${key}${tonalSuffix}`);
   if (chord.empty) return [];
 
-  const supported = new Set(['', 'm', '7', 'm7', 'maj7', 'sus4', 'sus2']);
+  const supported = new Set(['', 'm', 'dim', 'aug', '5','7', 'm7', 'maj7', 'sus4', 'sus2']);
   if (!supported.has(tonalSuffix)) return [];
 
   const positions: ChordPosition[] = [];
@@ -180,6 +180,12 @@ function generateCommonBarreVoicings(key: string, suffix: string, maxFret: numbe
           return [f, f + 2, f + 2, f + 1, f, f];
         case 'm':
           return [f, f + 2, f + 2, f, f, f];
+        case 'dim':
+          return [f, f + 1, f + 2, f, -1, -1];
+        case 'aug':
+          return [f, f + 3, f + 2, f + 1, -1, -1];
+        case '5':
+          return [f, f + 2, f + 2, -1, -1, -1];
         case '7':
           return [f, f + 2, f, f + 1, f, f];
         case 'm7':
@@ -215,6 +221,12 @@ function generateCommonBarreVoicings(key: string, suffix: string, maxFret: numbe
           return [-1, f, f + 2, f + 2, f + 2, f];
         case 'm':
           return [-1, f, f + 2, f + 2, f + 1, f];
+        case 'dim':
+          return [-1, f, f + 1, f + 2, f + 1, -1];
+        case 'aug':
+          return [-1, f, f + 3, f + 2, f + 2, -1];
+        case '5':
+          return [-1, f, f + 2, f + 2, -1, -1];
         case '7':
           return [-1, f, f + 2, f, f + 2, f];
         case 'm7':

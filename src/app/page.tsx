@@ -12,6 +12,7 @@ import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Guitar, SlidersHorizontal, Volume2 } from 'lucide-react';
 import { ChordDiagram } from '@/components/ChordDiagram';
+import { ChordKnowledge } from '@/components/ChordKnowledge';
 
 // Standard tuning MIDI notes: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
 const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
@@ -83,6 +84,9 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <ChordKnowledge />
+            </div>
             <Sheet>
               <SheetTrigger asChild>
                 <button
@@ -97,7 +101,10 @@ export default function Home() {
                 <SheetHeader>
                   <SheetTitle>选择和弦</SheetTitle>
                 </SheetHeader>
-                <div className="mt-4">
+                <div className="mt-4 space-y-4">
+                  <div className="sm:hidden">
+                    <ChordKnowledge />
+                  </div>
                   <ChordSelector
                     selectedKey={selectedKey}
                     selectedSuffix={selectedSuffix}
@@ -197,7 +204,7 @@ export default function Home() {
 
         {/* Fretboard Display - Full Width */}
         <Card className="rounded-xl p-4">
-          {chordData ? (
+          {activePositions.length > 0 ? (
             <VoicingBrowser
               root={selectedKey}
               positions={activePositions}
