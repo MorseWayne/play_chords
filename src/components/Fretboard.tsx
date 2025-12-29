@@ -1,26 +1,30 @@
 'use client';
 
 import * as React from 'react';
+import { Note } from '@tonaljs/tonal';
 import { cn } from '@/lib/utils';
 
 const STRING_LABELS_HIGH_TO_LOW = ['E', 'B', 'G', 'D', 'A', 'E'] as const;
 const STANDARD_TUNING_MIDI_LOW_TO_HIGH = [40, 45, 50, 55, 59, 64];
 
+function midiToPitchClass(midi: number): string {
+  const pcs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  return pcs[((midi % 12) + 12) % 12];
+}
+
+function pitchClassToChroma(pc: string): number {
+  const c = Note.chroma(pc);
+  return typeof c === 'number' ? c : -1;
+}
+
 export interface FretboardProps {
   fretsLowToHigh: number[]; // length 6, low E -> high E, -1 mute, 0 open, >0 fret
-  fingersLowToHigh?: number[]; // length 6, 0=open/mute, 1..4
-  barres?: number[]; // fret numbers that are barred (e.g. [8])
+  chordRoot?: string; // pitch class (e.g. C, F#, Bb)
   maxFret?: number; // inclusive
   className?: string;
 }
 
-export function Fretboard({
-  fretsLowToHigh,
-  fingersLowToHigh,
-  barres = [],
-  maxFret = 15,
-  className,
-}: FretboardProps) {
+export function Fretboard({ fretsLowToHigh, chordRoot, maxFret = 15, className }: FretboardProps) {
   const width = 980;
   const height = 260;
   const leftPad = 56; // labels area
@@ -36,9 +40,10 @@ export function Fretboard({
   const stringGap = boardHeight / (stringCount - 1);
   const fretGap = boardWidth / (fretCount);
 
+  const rootChroma = chordRoot ? pitchClassToChroma(chordRoot) : -1;
+
   // Convert to high->low for rendering lines
   const fretsHighToLow = [...fretsLowToHigh].reverse();
-  const fingersHighToLow = (fingersLowToHigh ? [...fingersLowToHigh] : new Array(6).fill(0)).reverse();
 
   function xForFret(fret: number): number {
     // position inside fret cell (between fret-1 and fret)
@@ -151,37 +156,11 @@ export function Fretboard({
           );
         })}
 
-        {/* barre overlays */}
-        {barres.map((bf) => {
-          const x = xForFret(bf);
-          const involved: number[] = [];
-          fretsHighToLow.forEach((f, idx) => {
-            if (f === bf) involved.push(idx);
-          });
-          if (involved.length < 2) return null;
-          const topIdx = Math.min(...involved);
-          const botIdx = Math.max(...involved);
-          const y1 = topPad + stringGap * topIdx;
-          const y2 = topPad + stringGap * botIdx;
-          const h = Math.max(14, y2 - y1);
-          return (
-            <rect
-              key={`barre-${bf}`}
-              x={x - 12}
-              y={y1 - 10}
-              width={24}
-              height={h + 20}
-              rx={12}
-              className="fill-primary"
-              opacity={0.35}
-            />
-          );
-        })}
-
         {/* notes */}
         {fretsHighToLow.map((fret, idxHighToLow) => {
           const y = topPad + stringGap * idxHighToLow;
-          const finger = fingersHighToLow[idxHighToLow] ?? 0;
+          const stringIndexLowToHigh = 5 - idxHighToLow;
+          const openMidi = STANDARD_TUNING_MIDI_LOW_TO_HIGH[stringIndexLowToHigh];
 
           if (fret < 0) {
             return (
@@ -199,6 +178,10 @@ export function Fretboard({
             );
           }
 
+          const midi = openMidi + fret;
+          const chroma = midi % 12;
+          const isRoot = rootChroma >= 0 ? chroma === rootChroma : false;
+
           // open string: show hollow circle near nut
           if (fret === 0) {
             return (
@@ -207,9 +190,15 @@ export function Fretboard({
                   cx={leftPad + 22}
                   cy={y}
                   r={8}
-                  className="fill-background stroke-border"
+                  className={cn(
+                    'fill-background stroke-border',
+                    isRoot && 'stroke-primary',
+                  )}
                   strokeWidth={2}
                 />
+                {isRoot && (
+                  <circle cx={leftPad + 22} cy={y} r={3} className="fill-primary" />
+                )}
               </g>
             );
           }
@@ -221,7 +210,9 @@ export function Fretboard({
                 cx={x}
                 cy={y}
                 r={10}
-                className="fill-foreground"
+                className={cn(
+                  isRoot ? 'fill-primary' : 'fill-foreground',
+                )}
                 opacity={0.9}
               />
               <circle
@@ -234,12 +225,12 @@ export function Fretboard({
               <text
                 x={x}
                 y={y + 4}
-                className="fill-background"
+                className={cn(isRoot ? 'fill-primary-foreground' : 'fill-background')}
                 fontSize="10"
-                fontWeight={800}
+                fontWeight={700}
                 textAnchor="middle"
               >
-                {finger > 0 ? finger : ''}
+                {midiToPitchClass(midi)}
               </text>
             </g>
           );
