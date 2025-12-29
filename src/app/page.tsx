@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { ChordSelector } from '@/components/ChordSelector';
 import { ChordDisplay } from '@/components/ChordDisplay';
 import { PlaybackControls } from '@/components/PlaybackControls';
+import { MobileActionBar } from '@/components/MobileActionBar';
 import { getChordData } from '@/lib/chords';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -20,6 +21,11 @@ export default function Home() {
     return getChordData(selectedKey, selectedSuffix);
   }, [selectedKey, selectedSuffix]);
 
+  const totalVariants = chordData?.positions?.length ?? 0;
+  const safeVariant =
+    totalVariants > 0 ? Math.min(Math.max(0, currentVariant), totalVariants - 1) : 0;
+  const currentChord = chordData?.positions?.[safeVariant] ?? null;
+
   const handleKeyChange = (key: string) => {
     setSelectedKey(key);
     setCurrentVariant(0);
@@ -31,7 +37,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className="min-h-screen bg-background pb-28 lg:pb-16">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/55">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -132,7 +138,7 @@ export default function Home() {
               </CardHeader>
               <CardContent className="flex justify-center pb-6">
                 <PlaybackControls 
-                  chord={chordData && chordData.positions ? chordData.positions[currentVariant] : null} 
+                  chord={currentChord}
                 />
               </CardContent>
             </Card>
@@ -161,7 +167,7 @@ export default function Home() {
                     <div className="flex flex-col items-center">
                       <ChordDisplay
                         positions={chordData.positions}
-                        currentVariant={currentVariant}
+                        currentVariant={safeVariant}
                         onVariantChange={setCurrentVariant}
                       />
                       <div className="mt-6 text-center text-xs text-muted-foreground">
@@ -173,25 +179,19 @@ export default function Home() {
                   )}
                </Card>
             </div>
-
-            {/* Mobile playback card */}
-            <div className="mt-6 w-full lg:hidden">
-              <Card className="rounded-3xl">
-                <CardHeader>
-                  <CardTitle>播放控制</CardTitle>
-                  <CardDescription>移动端把和弦选择收进抽屉了，试听在这里。</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center pb-6">
-                  <PlaybackControls
-                    chord={chordData && chordData.positions ? chordData.positions[currentVariant] : null}
-                  />
-                </CardContent>
-              </Card>
-            </div>
           </div>
 
         </div>
       </main>
+
+      {/* Mobile fixed action bar */}
+      <MobileActionBar
+        chord={currentChord}
+        currentVariant={safeVariant}
+        totalVariants={totalVariants}
+        onPrevVariant={() => setCurrentVariant((v) => Math.max(0, v - 1))}
+        onNextVariant={() => setCurrentVariant((v) => Math.min(Math.max(0, totalVariants - 1), v + 1))}
+      />
     </div>
   );
 }
