@@ -7,12 +7,14 @@ import { MobileActionBar } from '@/components/MobileActionBar';
 import { VoicingBrowser } from '@/components/VoicingBrowser';
 import { getChordData, formatSuffix, getSuffixLabel } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
+import { detectChordType, getChordTypeLabels, getChordTypeBadgeStyle } from '@/lib/chord-type';
 import { Card } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Guitar, SlidersHorizontal, Volume2 } from 'lucide-react';
 import { ChordDiagram } from '@/components/ChordDiagram';
 import { ChordKnowledge } from '@/components/ChordKnowledge';
+import { cn } from '@/lib/utils';
 
 // Standard tuning MIDI notes: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
 const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
@@ -140,9 +142,31 @@ export default function Home() {
 
           {/* 和弦指法卡片 */}
           <Card className="rounded-xl p-3 flex flex-col">
-            <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground">
-              <Guitar className="h-3 w-3" />
-              指法
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Guitar className="h-3 w-3" />
+                指法
+              </div>
+              {/* 和弦类型标签 - 更大更醒目 */}
+              {currentChord && (() => {
+                const typeInfo = detectChordType(currentChord);
+                const labels = getChordTypeLabels(typeInfo);
+                return labels.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    {labels.map((label, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold shadow-sm',
+                          getChordTypeBadgeStyle(label)
+                        )}
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
             <div className="flex-1 flex items-center justify-center gap-6">
               {/* 左侧：和弦图 */}

@@ -6,9 +6,178 @@ const PITCH_CLASSES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#
 // Standard tuning MIDI notes for strings (low -> high): E2 A2 D3 G3 B3 E4
 const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
 
+// ============================================================
+// 常见开放和弦数据库
+// 这些是经过实践验证的经典开放和弦指法
+// ============================================================
+
+interface OpenChordEntry {
+  key: string;
+  suffix: string;  // 'major', 'minor', '7', 'm7', 'maj7', 'sus4', 'sus2', 'dim', 'aug', '5', '6'
+  frets: number[];
+}
+
+// 开放和弦数据库 - 常见的开放和弦指法
+const OPEN_CHORDS: OpenChordEntry[] = [
+  // === C 系列 ===
+  { key: 'C', suffix: 'major', frets: [-1, 3, 2, 0, 1, 0] },      // 经典 C
+  { key: 'C', suffix: 'major', frets: [0, 3, 2, 0, 1, 0] },       // C 带低音 E
+  { key: 'C', suffix: 'major', frets: [-1, 3, 2, 0, 1, 3] },      // C 高把位变体
+  { key: 'C', suffix: 'minor', frets: [-1, 3, 1, 0, 1, 3] },      // Cm (需小横按)
+  { key: 'C', suffix: '7', frets: [-1, 3, 2, 3, 1, 0] },          // C7
+  { key: 'C', suffix: 'maj7', frets: [-1, 3, 2, 0, 0, 0] },       // Cmaj7
+  { key: 'C', suffix: 'm7', frets: [-1, 3, 1, 3, 1, 3] },         // Cm7
+  { key: 'C', suffix: 'sus4', frets: [-1, 3, 3, 0, 1, 1] },       // Csus4
+  { key: 'C', suffix: 'sus2', frets: [-1, 3, 0, 0, 1, 0] },       // Csus2
+  { key: 'C', suffix: '6', frets: [-1, 3, 2, 2, 1, 0] },          // C6
+  { key: 'C', suffix: 'aug', frets: [-1, 3, 2, 1, 1, 0] },        // Caug
+  { key: 'C', suffix: 'dim', frets: [-1, 3, 1, -1, 1, 2] },       // Cdim
+
+  // === D 系列 ===
+  { key: 'D', suffix: 'major', frets: [-1, -1, 0, 2, 3, 2] },     // 经典 D
+  { key: 'D', suffix: 'major', frets: [-1, 0, 0, 2, 3, 2] },      // D 带低音 A
+  { key: 'D', suffix: 'minor', frets: [-1, -1, 0, 2, 3, 1] },     // Dm
+  { key: 'D', suffix: 'minor', frets: [-1, 0, 0, 2, 3, 1] },      // Dm 带低音 A
+  { key: 'D', suffix: '7', frets: [-1, -1, 0, 2, 1, 2] },         // D7
+  { key: 'D', suffix: 'maj7', frets: [-1, -1, 0, 2, 2, 2] },      // Dmaj7
+  { key: 'D', suffix: 'm7', frets: [-1, -1, 0, 2, 1, 1] },        // Dm7
+  { key: 'D', suffix: 'sus4', frets: [-1, -1, 0, 2, 3, 3] },      // Dsus4
+  { key: 'D', suffix: 'sus2', frets: [-1, -1, 0, 2, 3, 0] },      // Dsus2
+  { key: 'D', suffix: '6', frets: [-1, -1, 0, 2, 0, 2] },         // D6
+  { key: 'D', suffix: 'aug', frets: [-1, -1, 0, 3, 3, 2] },       // Daug
+  { key: 'D', suffix: 'dim', frets: [-1, -1, 0, 1, 3, 1] },       // Ddim
+
+  // === E 系列 ===
+  { key: 'E', suffix: 'major', frets: [0, 2, 2, 1, 0, 0] },       // 经典 E
+  { key: 'E', suffix: 'minor', frets: [0, 2, 2, 0, 0, 0] },       // Em
+  { key: 'E', suffix: 'minor', frets: [0, 2, 2, 0, 3, 0] },       // Em 变体
+  { key: 'E', suffix: '7', frets: [0, 2, 0, 1, 0, 0] },           // E7
+  { key: 'E', suffix: '7', frets: [0, 2, 2, 1, 3, 0] },           // E7 变体
+  { key: 'E', suffix: 'maj7', frets: [0, 2, 1, 1, 0, 0] },        // Emaj7
+  { key: 'E', suffix: 'm7', frets: [0, 2, 0, 0, 0, 0] },          // Em7
+  { key: 'E', suffix: 'm7', frets: [0, 2, 2, 0, 3, 0] },          // Em7 变体
+  { key: 'E', suffix: 'sus4', frets: [0, 2, 2, 2, 0, 0] },        // Esus4
+  { key: 'E', suffix: 'sus2', frets: [0, 2, 4, 4, 0, 0] },        // Esus2
+  { key: 'E', suffix: '5', frets: [0, 2, 2, -1, -1, -1] },        // E5
+  { key: 'E', suffix: '6', frets: [0, 2, 2, 1, 2, 0] },           // E6
+  { key: 'E', suffix: 'aug', frets: [0, 3, 2, 1, 1, 0] },         // Eaug
+  { key: 'E', suffix: 'dim', frets: [-1, -1, 2, 3, 2, 3] },       // Edim
+
+  // === F 系列（半开放/易用形式）===
+  { key: 'F', suffix: 'major', frets: [-1, -1, 3, 2, 1, 1] },     // F (简化版)
+  { key: 'F', suffix: 'major', frets: [1, -1, 3, 2, 1, 1] },      // F 带低音
+  { key: 'F', suffix: 'minor', frets: [-1, -1, 3, 1, 1, 1] },     // Fm (简化版)
+  { key: 'F', suffix: '7', frets: [-1, -1, 3, 5, 4, 5] },         // F7
+  { key: 'F', suffix: 'maj7', frets: [-1, -1, 3, 2, 1, 0] },      // Fmaj7
+  { key: 'F', suffix: 'm7', frets: [-1, -1, 3, 1, 1, 1] },        // Fm7
+  { key: 'F', suffix: 'sus4', frets: [-1, -1, 3, 3, 1, 1] },      // Fsus4
+  { key: 'F', suffix: 'sus2', frets: [-1, -1, 3, 0, 1, 1] },      // Fsus2
+
+  // === G 系列 ===
+  { key: 'G', suffix: 'major', frets: [3, 2, 0, 0, 0, 3] },       // 经典 G
+  { key: 'G', suffix: 'major', frets: [3, 2, 0, 0, 3, 3] },       // G 变体
+  { key: 'G', suffix: 'major', frets: [3, 0, 0, 0, 0, 3] },       // G (Folk形式)
+  { key: 'G', suffix: 'minor', frets: [3, 1, 0, 0, 3, 3] },       // Gm (半开放)
+  { key: 'G', suffix: '7', frets: [3, 2, 0, 0, 0, 1] },           // G7
+  { key: 'G', suffix: '7', frets: [1, 2, 0, 0, 0, 1] },           // G7 变体
+  { key: 'G', suffix: 'maj7', frets: [3, 2, 0, 0, 0, 2] },        // Gmaj7
+  { key: 'G', suffix: 'm7', frets: [-1, 1, 0, 0, 3, 3] },         // Gm7 (半开放)
+  { key: 'G', suffix: 'sus4', frets: [3, 3, 0, 0, 1, 3] },        // Gsus4
+  { key: 'G', suffix: 'sus2', frets: [3, 0, 0, 0, 3, 3] },        // Gsus2
+  { key: 'G', suffix: '5', frets: [3, 5, 5, -1, -1, -1] },        // G5
+  { key: 'G', suffix: '6', frets: [3, 2, 0, 0, 0, 0] },           // G6
+  { key: 'G', suffix: 'aug', frets: [3, 2, 1, 0, 0, 3] },         // Gaug
+  { key: 'G', suffix: 'dim', frets: [-1, -1, 5, 3, 2, 3] },       // Gdim
+
+  // === A 系列 ===
+  { key: 'A', suffix: 'major', frets: [-1, 0, 2, 2, 2, 0] },      // 经典 A
+  { key: 'A', suffix: 'major', frets: [0, 0, 2, 2, 2, 0] },       // A 带低音 E
+  { key: 'A', suffix: 'minor', frets: [-1, 0, 2, 2, 1, 0] },      // Am
+  { key: 'A', suffix: 'minor', frets: [0, 0, 2, 2, 1, 0] },       // Am 带低音 E
+  { key: 'A', suffix: '7', frets: [-1, 0, 2, 0, 2, 0] },          // A7
+  { key: 'A', suffix: '7', frets: [-1, 0, 2, 2, 2, 3] },          // A7 变体
+  { key: 'A', suffix: 'maj7', frets: [-1, 0, 2, 1, 2, 0] },       // Amaj7
+  { key: 'A', suffix: 'm7', frets: [-1, 0, 2, 0, 1, 0] },         // Am7
+  { key: 'A', suffix: 'm7', frets: [-1, 0, 2, 2, 1, 3] },         // Am7 变体
+  { key: 'A', suffix: 'sus4', frets: [-1, 0, 2, 2, 3, 0] },       // Asus4
+  { key: 'A', suffix: 'sus2', frets: [-1, 0, 2, 2, 0, 0] },       // Asus2
+  { key: 'A', suffix: '5', frets: [-1, 0, 2, 2, -1, -1] },        // A5
+  { key: 'A', suffix: '6', frets: [-1, 0, 2, 2, 2, 2] },          // A6
+  { key: 'A', suffix: 'aug', frets: [-1, 0, 3, 2, 2, 1] },        // Aaug
+  { key: 'A', suffix: 'dim', frets: [-1, 0, 1, 2, 1, -1] },       // Adim
+
+  // === B 系列 (多为半封闭) ===
+  { key: 'B', suffix: 'major', frets: [-1, 2, 4, 4, 4, 2] },      // B (横按)
+  { key: 'B', suffix: 'minor', frets: [-1, 2, 4, 4, 3, 2] },      // Bm (横按)
+  { key: 'B', suffix: '7', frets: [-1, 2, 1, 2, 0, 2] },          // B7 (开放型)
+  { key: 'B', suffix: '7', frets: [-1, 2, 4, 2, 4, 2] },          // B7 (横按)
+  { key: 'B', suffix: 'maj7', frets: [-1, 2, 4, 3, 4, 2] },       // Bmaj7
+  { key: 'B', suffix: 'm7', frets: [-1, 2, 0, 2, 0, 2] },         // Bm7 (开放型)
+  { key: 'B', suffix: 'm7', frets: [-1, 2, 4, 2, 3, 2] },         // Bm7 (横按)
+  { key: 'B', suffix: 'sus4', frets: [-1, 2, 4, 4, 5, 2] },       // Bsus4
+  { key: 'B', suffix: 'sus2', frets: [-1, 2, 4, 4, 2, 2] },       // Bsus2
+
+  // === Bb/A# 系列 ===
+  { key: 'Bb', suffix: 'major', frets: [-1, 1, 3, 3, 3, 1] },     // Bb (横按)
+  { key: 'Bb', suffix: 'minor', frets: [-1, 1, 3, 3, 2, 1] },     // Bbm
+  { key: 'Bb', suffix: '7', frets: [-1, 1, 3, 1, 3, 1] },         // Bb7
+  { key: 'Bb', suffix: 'maj7', frets: [-1, 1, 3, 2, 3, 1] },      // Bbmaj7
+  { key: 'Bb', suffix: 'm7', frets: [-1, 1, 3, 1, 2, 1] },        // Bbm7
+
+  // === Eb/D# 系列 ===
+  { key: 'Eb', suffix: 'major', frets: [-1, -1, 1, 3, 4, 3] },    // Eb (D型)
+  { key: 'Eb', suffix: 'minor', frets: [-1, -1, 1, 3, 4, 2] },    // Ebm
+  { key: 'Eb', suffix: '7', frets: [-1, -1, 1, 3, 2, 3] },        // Eb7
+  { key: 'Eb', suffix: 'maj7', frets: [-1, -1, 1, 3, 3, 3] },     // Ebmaj7
+  { key: 'Eb', suffix: 'm7', frets: [-1, -1, 1, 3, 2, 2] },       // Ebm7
+
+  // === Ab/G# 系列 ===
+  { key: 'Ab', suffix: 'major', frets: [4, 6, 6, 5, 4, 4] },      // Ab (E型横按)
+  { key: 'Ab', suffix: 'minor', frets: [4, 6, 6, 4, 4, 4] },      // Abm
+  { key: 'Ab', suffix: '7', frets: [4, 6, 4, 5, 4, 4] },          // Ab7
+  { key: 'Ab', suffix: 'maj7', frets: [4, 6, 5, 5, 4, 4] },       // Abmaj7
+  { key: 'Ab', suffix: 'm7', frets: [4, 6, 4, 4, 4, 4] },         // Abm7
+
+  // === C#/Db 系列 ===
+  { key: 'C#', suffix: 'major', frets: [-1, 4, 6, 6, 6, 4] },     // C# (A型横按)
+  { key: 'C#', suffix: 'minor', frets: [-1, 4, 6, 6, 5, 4] },     // C#m
+  { key: 'C#', suffix: '7', frets: [-1, 4, 6, 4, 6, 4] },         // C#7
+  { key: 'C#', suffix: 'maj7', frets: [-1, 4, 6, 5, 6, 4] },      // C#maj7
+  { key: 'C#', suffix: 'm7', frets: [-1, 4, 6, 4, 5, 4] },        // C#m7
+
+  // === F#/Gb 系列 ===
+  { key: 'F#', suffix: 'major', frets: [2, 4, 4, 3, 2, 2] },      // F# (E型横按)
+  { key: 'F#', suffix: 'minor', frets: [2, 4, 4, 2, 2, 2] },      // F#m
+  { key: 'F#', suffix: '7', frets: [2, 4, 2, 3, 2, 2] },          // F#7
+  { key: 'F#', suffix: 'maj7', frets: [2, 4, 3, 3, 2, 2] },       // F#maj7
+  { key: 'F#', suffix: 'm7', frets: [2, 4, 2, 2, 2, 2] },         // F#m7
+  { key: 'F#', suffix: 'sus4', frets: [2, 4, 4, 4, 2, 2] },       // F#sus4
+  { key: 'F#', suffix: 'sus2', frets: [2, 4, 4, 1, 2, 2] },       // F#sus2
+];
+
 function midiToPitchClass(midi: number): string {
   const pc = PITCH_CLASSES[((midi % 12) + 12) % 12];
   return pc;
+}
+
+// 获取特定 key/suffix 的开放和弦
+function getOpenChordsForKey(key: string, suffix: string): number[][] {
+  const normalizedKey = normalizeKey(key);
+  return OPEN_CHORDS
+    .filter(c => normalizeKey(c.key) === normalizedKey && c.suffix === suffix)
+    .map(c => c.frets);
+}
+
+// 标准化 key 名称 (处理等音名)
+function normalizeKey(key: string): string {
+  const enharmonics: Record<string, string> = {
+    'Db': 'C#',
+    'D#': 'Eb',
+    'Gb': 'F#',
+    'G#': 'Ab',
+    'A#': 'Bb',
+  };
+  return enharmonics[key] ?? key;
 }
 
 function suffixToTonalSymbol(suffix: string): string {
@@ -243,7 +412,101 @@ function generateCommonBarreVoicings(key: string, suffix: string, maxFret: numbe
     })();
     if (!shape) continue;
     if (shape.some((x) => x > maxFret)) continue;
-    // Avoid the very low A-shape at f=1 that collides with open-ish shapes; keep but score will decide.
+    positions.push(toChordPosition(shape));
+  }
+
+  // C-shape (root on A string, higher voicing)
+  // 这是 CAGED 系统中的 C型指法，根音在 A 弦
+  // Major: [-1, f, f+2, f-1, f+1, f]  (需要 f >= 3)
+  for (const f of aRoots) {
+    if (f < 3) continue; // C型需要足够的把位空间
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [-1, f, f + 2, f - 1, f + 1, f];
+        case 'm':
+          return [-1, f, f + 2, f - 1, f, f];
+        case '7':
+          return [-1, f, f + 2, f + 1, f + 1, f];
+        case 'maj7':
+          return [-1, f, f + 2, f - 1, f, f];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x !== -1 && (x < 0 || x > maxFret))) continue;
+    positions.push(toChordPosition(shape));
+  }
+
+  // D-shape (root on D string)
+  // 这是 CAGED 系统中的 D型指法，根音在 D 弦
+  const dRoots = rootFretsForString(STANDARD_TUNING_MIDI[2], rootChroma, maxFret);
+  for (const f of dRoots) {
+    if (f < 2) continue; // D型需要足够把位空间
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [-1, -1, f, f + 2, f + 3, f + 2];
+        case 'm':
+          return [-1, -1, f, f + 2, f + 3, f + 1];
+        case '7':
+          return [-1, -1, f, f + 2, f + 1, f + 2];
+        case 'm7':
+          return [-1, -1, f, f + 2, f + 1, f + 1];
+        case 'maj7':
+          return [-1, -1, f, f + 2, f + 2, f + 2];
+        case 'sus4':
+          return [-1, -1, f, f + 2, f + 3, f + 3];
+        case 'sus2':
+          return [-1, -1, f, f + 2, f + 3, f];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x !== -1 && x > maxFret)) continue;
+    positions.push(toChordPosition(shape));
+  }
+
+  // G-shape (root on low E string, different fingering)
+  // 这是 CAGED 系统中的 G型指法
+  for (const f of eRoots) {
+    if (f < 3) continue; // G型需要足够把位空间
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [f, f + 2, f - 1, f - 1, f - 1, f];
+        case 'm':
+          return [f, f + 2, f - 1, f - 1, f - 2, f];
+        case '7':
+          return [f, f + 2, f - 1, f - 1, f - 1, f - 2];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x !== -1 && (x < 0 || x > maxFret))) continue;
+    positions.push(toChordPosition(shape));
+  }
+
+  // 额外的小横按/半横按形式（更易于演奏的变体）
+  // Am型 (root on high E string) - 常见的高把位小横按
+  const highERoots = rootFretsForString(STANDARD_TUNING_MIDI[5], rootChroma, maxFret);
+  for (const f of highERoots) {
+    if (f < 3 || f > maxFret - 2) continue;
+    const shape = (() => {
+      switch (tonalSuffix) {
+        case '':
+          return [-1, -1, f + 2, f + 2, f + 1, f];
+        case 'm':
+          return [-1, -1, f + 2, f + 2, f, f];
+        default:
+          return null;
+      }
+    })();
+    if (!shape) continue;
+    if (shape.some((x) => x !== -1 && x > maxFret)) continue;
     positions.push(toChordPosition(shape));
   }
 
@@ -485,6 +748,7 @@ export function pickPracticalVoicings(
 ): ChordPosition[] {
   const limit = options.limit ?? 10;
   const maxFret = options.maxFret ?? 15;
+  const minVoicings = 5; // 每个和弦至少返回 5 个把位
 
   const chordSymbol = `${key}${suffixToTonalSymbol(suffix)}`;
   const chord = Chord.get(chordSymbol);
@@ -495,10 +759,10 @@ export function pickPracticalVoicings(
   const minSoundingStrings =
     chordChromas.size <= 2 ? 2 : chordChromas.size >= 4 ? 4 : 3;
 
-  type Scored = { pos: ChordPosition; score: number; src: 'db' | 'gen' };
+  type Scored = { pos: ChordPosition; score: number; src: 'db' | 'gen' | 'open' };
   const scored: Scored[] = [];
 
-  const add = (pos: ChordPosition, src: 'db' | 'gen', bonus = 0) => {
+  const add = (pos: ChordPosition, src: 'db' | 'gen' | 'open', bonus = 0) => {
     const score = practicalScore({
       frets: pos.frets,
       chordChromas,
@@ -506,15 +770,26 @@ export function pickPracticalVoicings(
       minSoundingStrings,
     });
     if (!Number.isFinite(score)) return;
-    // Prefer DB shapes slightly when scores are close
-    scored.push({ pos, score: score + (src === 'db' ? -6 : 0) + bonus, src });
+    // Prefer DB and open shapes slightly when scores are close
+    const srcBonus = src === 'db' ? -6 : src === 'open' ? -10 : 0;
+    scored.push({ pos, score: score + srcBonus + bonus, src });
   };
 
-  const barre = generateCommonBarreVoicings(key, suffix, maxFret);
+  // 1. 获取开放和弦（最高优先级）
+  const openChordFrets = getOpenChordsForKey(key, suffix);
+  openChordFrets.forEach((frets) => {
+    const pos = toChordPosition(frets);
+    add(pos, 'open', -15); // 开放和弦给予额外优先级
+  });
 
+  // 2. 数据库中的指法
   fromDb.forEach((p) => add(p, 'db'));
-  // Strongly prefer classic barre shapes when they exist
-  barre.forEach((p) => add(p, 'gen', -8));
+
+  // 3. 生成的封闭和弦和 CAGED 形状
+  const barre = generateCommonBarreVoicings(key, suffix, maxFret);
+  barre.forEach((p) => add(p, 'gen', -8)); // 经典封闭和弦形状优先
+
+  // 4. 其他生成的指法
   generated.forEach((p) => add(p, 'gen'));
 
   const seen = new Set<string>();
@@ -527,10 +802,10 @@ export function pickPracticalVoicings(
       return true;
     });
 
-  // Bucket selection: ensure we keep some higher-position barres if available
-  const low: ChordPosition[] = [];
-  const mid: ChordPosition[] = [];
-  const high: ChordPosition[] = [];
+  // Bucket selection: ensure we keep some from each position range
+  const low: ChordPosition[] = [];   // 0-4品
+  const mid: ChordPosition[] = [];   // 5-8品
+  const high: ChordPosition[] = [];  // 9+品
 
   for (const s of sorted) {
     const maxFretUsed = Math.max(...s.pos.frets.filter((f) => f > 0), 0);
@@ -540,20 +815,34 @@ export function pickPracticalVoicings(
   }
 
   const pick: ChordPosition[] = [];
-  const quotaLow = Math.min(4, limit);
-  const quotaMid = Math.min(3, Math.max(0, limit - quotaLow));
-  const quotaHigh = Math.max(0, limit - quotaLow - quotaMid);
+
+  // 确保低把位至少有 2-3 个选择
+  const quotaLow = Math.min(Math.max(3, Math.ceil(limit * 0.4)), low.length);
+  // 中把位也要有 1-2 个
+  const quotaMid = Math.min(Math.max(2, Math.ceil(limit * 0.3)), mid.length);
+  // 高把位 1-2 个
+  const quotaHigh = Math.min(Math.max(1, Math.ceil(limit * 0.2)), high.length);
 
   pick.push(...low.slice(0, quotaLow));
   pick.push(...mid.slice(0, quotaMid));
   pick.push(...high.slice(0, quotaHigh));
 
-  if (pick.length < limit) {
+  // 如果还没达到最小数量，继续添加
+  if (pick.length < minVoicings) {
     const rest = [...low.slice(quotaLow), ...mid.slice(quotaMid), ...high.slice(quotaHigh)];
     for (const p of rest) {
-      if (pick.length >= limit) break;
-      // de-dupe again
+      if (pick.length >= Math.max(minVoicings, limit)) break;
       if (!pick.find((x) => x.frets.join(',') === p.frets.join(','))) pick.push(p);
+    }
+  }
+
+  // 如果还是不够，从 sorted 中继续添加
+  if (pick.length < minVoicings) {
+    for (const s of sorted) {
+      if (pick.length >= Math.max(minVoicings, limit)) break;
+      if (!pick.find((x) => x.frets.join(',') === s.pos.frets.join(','))) {
+        pick.push(s.pos);
+      }
     }
   }
 
