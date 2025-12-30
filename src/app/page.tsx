@@ -5,13 +5,15 @@ import { ChordSelector } from '@/components/ChordSelector';
 import { PlaybackControls } from '@/components/PlaybackControls';
 import { MobileActionBar } from '@/components/MobileActionBar';
 import { VoicingBrowser } from '@/components/VoicingBrowser';
+import { MetronomeDialog } from '@/components/MetronomeDialog';
 import { getChordData, formatSuffix, getSuffixLabel } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
 import { detectChordType, getChordTypeLabels, getChordTypeBadgeStyle } from '@/lib/chord-type';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Guitar, SlidersHorizontal, Volume2 } from 'lucide-react';
+import { Guitar, SlidersHorizontal, Volume2, Timer } from 'lucide-react';
 import { ChordDiagram } from '@/components/ChordDiagram';
 import { ChordKnowledge } from '@/components/ChordKnowledge';
 import { cn } from '@/lib/utils';
@@ -35,6 +37,7 @@ export default function Home() {
   const [selectedKey, setSelectedKey] = useState('C');
   const [selectedSuffix, setSelectedSuffix] = useState('major');
   const [currentVariant, setCurrentVariant] = useState(0);
+  const [metronomeOpen, setMetronomeOpen] = useState(false);
   
   const chordData = useMemo(() => {
     return getChordData(selectedKey, selectedSuffix);
@@ -113,18 +116,21 @@ export default function Home() {
                     onKeyChange={handleKeyChange}
                     onSuffixChange={handleSuffixChange}
                   />
-                  
-                  {/* 移动端节拍器 */}
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center gap-1.5 mb-3 text-xs font-medium text-muted-foreground">
-                      <Volume2 className="h-3 w-3" />
-                      节拍器
-                    </div>
-                    <PlaybackControls chord={currentChord} />
-                  </div>
                 </div>
               </SheetContent>
             </Sheet>
+            
+            {/* 节拍器按钮 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMetronomeOpen(true)}
+              className="h-9 gap-2"
+            >
+              <Timer className="h-4 w-4" />
+              <span className="hidden sm:inline">节拍器</span>
+            </Button>
+            
             <ModeToggle />
           </div>
         </div>
@@ -258,6 +264,9 @@ export default function Home() {
         onPrevVariant={() => setCurrentVariant((v) => Math.max(0, v - 1))}
         onNextVariant={() => setCurrentVariant((v) => Math.min(Math.max(0, totalVariants - 1), v + 1))}
       />
+
+      {/* 节拍器对话框 */}
+      <MetronomeDialog open={metronomeOpen} onOpenChange={setMetronomeOpen} />
     </div>
   );
 }
