@@ -1,9 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Play, Music } from 'lucide-react';
 import { ChordPosition } from '@/lib/chords';
 import { useAudio } from '@/hooks/useAudio';
 import { toast } from 'sonner';
+import { Metronome } from '@/components/Metronome';
 
 interface PlaybackControlsProps {
   chord: ChordPosition | null;
@@ -76,6 +78,12 @@ export function PlaybackControls({ chord }: PlaybackControlsProps) {
           分解
         </Button>
       </div>
+
+      {/* 节拍器分隔线 */}
+      <Separator className="my-2" />
+
+      {/* 节拍器组件 */}
+      <Metronome />
     </div>
   );
 }

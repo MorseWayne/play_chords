@@ -99,7 +99,7 @@ export default function Home() {
                   和弦
                 </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+              <SheetContent side="left" className="w-[300px] sm:w-[340px] overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>选择和弦</SheetTitle>
                 </SheetHeader>
@@ -113,6 +113,15 @@ export default function Home() {
                     onKeyChange={handleKeyChange}
                     onSuffixChange={handleSuffixChange}
                   />
+                  
+                  {/* 移动端节拍器 */}
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-1.5 mb-3 text-xs font-medium text-muted-foreground">
+                      <Volume2 className="h-3 w-3" />
+                      节拍器
+                    </div>
+                    <PlaybackControls chord={currentChord} />
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
