@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "bash deploy/deploy.sh",
+    "deploy:init": "sudo bash deploy/init-server.sh",
+    "deploy:ssl": "sudo bash deploy/setup-ssl.sh",
+    "deploy:nginx": "sudo bash deploy/setup-nginx.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
