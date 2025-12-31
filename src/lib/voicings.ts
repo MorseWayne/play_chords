@@ -1,8 +1,6 @@
 import { Chord, Note } from '@tonaljs/tonal';
 import type { ChordPosition } from '@/lib/chords';
 
-const PITCH_CLASSES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
-
 // Standard tuning MIDI notes for strings (low -> high): E2 A2 D3 G3 B3 E4
 const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
 
@@ -154,11 +152,6 @@ const OPEN_CHORDS: OpenChordEntry[] = [
   { key: 'F#', suffix: 'sus4', frets: [2, 4, 4, 4, 2, 2] },       // F#sus4
   { key: 'F#', suffix: 'sus2', frets: [2, 4, 4, 1, 2, 2] },       // F#sus2
 ];
-
-function midiToPitchClass(midi: number): string {
-  const pc = PITCH_CLASSES[((midi % 12) + 12) % 12];
-  return pc;
-}
 
 // 获取特定 key/suffix 的开放和弦
 function getOpenChordsForKey(key: string, suffix: string): number[][] {

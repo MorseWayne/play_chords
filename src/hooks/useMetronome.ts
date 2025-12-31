@@ -165,34 +165,24 @@ export function useMetronome() {
   const metronomeGainNodeRef = useRef<GainNode | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(DEFAULT_BPM);
-  const [timeSignature, setTimeSignature] = useState<TimeSignature>(DEFAULT_TIME_SIGNATURE);
-  const [volume, setVolume] = useState(DEFAULT_VOLUME);
+  const [bpm, setBpm] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_BPM;
+    return loadBPM();
+  });
+  const [timeSignature, setTimeSignature] = useState<TimeSignature>(() => {
+    if (typeof window === 'undefined') return DEFAULT_TIME_SIGNATURE;
+    return loadTimeSignature();
+  });
+  const [volume, setVolume] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_VOLUME;
+    return loadVolume();
+  });
   const [currentBeat, setCurrentBeat] = useState(0); // 0 表示未开始，1-N 表示当前拍
   
   // 用于存储下一次节拍的调度时间和定时器
   const nextBeatTimeRef = useRef<number>(0);
   const schedulerIdRef = useRef<number | null>(null);
   const beatCountRef = useRef<number>(0); // 追踪已播放的拍数
-
-  /**
-   * 在客户端加载保存的设置（仅在挂载后执行，避免 hydration mismatch）
-   */
-  useEffect(() => {
-    const savedBPM = loadBPM();
-    const savedTimeSignature = loadTimeSignature();
-    const savedVolume = loadVolume();
-    
-    if (savedBPM !== DEFAULT_BPM) {
-      setBpm(savedBPM);
-    }
-    if (savedTimeSignature !== DEFAULT_TIME_SIGNATURE) {
-      setTimeSignature(savedTimeSignature);
-    }
-    if (savedVolume !== DEFAULT_VOLUME) {
-      setVolume(savedVolume);
-    }
-  }, []);
 
   /**
    * 初始化 AudioContext 和主音量节点

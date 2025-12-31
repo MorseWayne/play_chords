@@ -44,7 +44,6 @@ export function ChordDiagram({
   const baseFretFontSize = isLarge ? 12 : 9;
   const muteFontSize = isLarge ? 14 : 10;
   const barreHeight = isLarge ? 14 : 10;
-  const maxWidth = isLarge ? 120 : 80;
   
   const stringGap = boardWidth / (stringCount - 1);
   const fretGap = boardHeight / fretCount;

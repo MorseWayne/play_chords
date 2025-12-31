@@ -1,5 +1,5 @@
 import React from 'react';
-// @ts-ignore
+// @ts-expect-error -- `@tombatossals/react-chords` deep import lacks proper TS types in this project setup.
 import Chord from '@tombatossals/react-chords/lib/Chord';
 import { ChordPosition } from '@/lib/chords';
 import { Button } from '@/components/ui/button';

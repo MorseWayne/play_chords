@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { ChordSelector } from '@/components/ChordSelector';
 import { PlaybackControls } from '@/components/PlaybackControls';
 import { MobileActionBar } from '@/components/MobileActionBar';
@@ -13,7 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Guitar, SlidersHorizontal, Volume2, Timer } from 'lucide-react';
+import { Guitar, SlidersHorizontal, Volume2, Timer, Music2 } from 'lucide-react';
 import { ChordDiagram } from '@/components/ChordDiagram';
 import { ChordKnowledge } from '@/components/ChordKnowledge';
 import { cn } from '@/lib/utils';
@@ -129,6 +130,14 @@ export default function Home() {
             >
               <Timer className="h-4 w-4" />
               <span className="hidden sm:inline">节拍器</span>
+            </Button>
+
+            {/* 和弦走向练习入口 */}
+            <Button variant="outline" size="sm" asChild className="h-9 gap-2">
+              <Link href="/progression-practice">
+                <Music2 className="h-4 w-4" />
+                <span className="hidden sm:inline">走向练习</span>
+              </Link>
             </Button>
             
             <ModeToggle />

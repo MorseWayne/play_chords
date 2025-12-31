@@ -26,6 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        {/* Prevent Dark Reader from injecting attributes/styles before hydration */}
+        <meta name="darkreader-lock" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
