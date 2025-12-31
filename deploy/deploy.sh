@@ -102,17 +102,44 @@ fi
 ###############################################################################
 # 4. 安装依赖
 ###############################################################################
-echo_step "4/8 安装生产依赖..."
+echo_step "4/8 检查并安装生产依赖..."
 
-if [ -f "package-lock.json" ]; then
-    echo_info "使用 npm ci 安装依赖(更快且可靠)..."
-    NODE_ENV=production npm ci
+# 检查依赖文件是否有变化
+NEED_INSTALL=false
+
+if [ -d ".git" ] && [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
+    # 检查 package.json 或 package-lock.json 是否有变化
+    if git diff --name-only $CURRENT_COMMIT $NEW_COMMIT | grep -qE '^package(-lock)?\.json$'; then
+        echo_info "检测到依赖文件有变化,需要重新安装"
+        NEED_INSTALL=true
+    else
+        echo_info "依赖文件无变化,跳过安装"
+        NEED_INSTALL=false
+    fi
 else
-    echo_warn "package-lock.json 不存在,使用 npm install..."
-    NODE_ENV=production npm install
+    # 如果不是 git 仓库或版本信息缺失,或首次部署,检查 node_modules 是否存在
+    if [ ! -d "node_modules" ]; then
+        echo_info "node_modules 不存在,需要安装依赖"
+        NEED_INSTALL=true
+    else
+        echo_warn "无法确定依赖变化,为确保安全将重新安装"
+        NEED_INSTALL=true
+    fi
 fi
 
-echo_info "依赖安装完成"
+# 执行依赖安装
+if [ "$NEED_INSTALL" = true ]; then
+    if [ -f "package-lock.json" ]; then
+        echo_info "使用 npm ci 安装依赖(更快且可靠)..."
+        NODE_ENV=production npm ci
+    else
+        echo_warn "package-lock.json 不存在,使用 npm install..."
+        NODE_ENV=production npm install
+    fi
+    echo_info "依赖安装完成"
+else
+    echo_info "跳过依赖安装,使用现有依赖"
+fi
 
 ###############################################################################
 # 5. 构建应用
