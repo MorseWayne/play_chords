@@ -100,45 +100,68 @@ else
 fi
 
 ###############################################################################
-# 4. 安装依赖
+# 4. 智能增量安装依赖
 ###############################################################################
-echo_step "4/8 检查并安装生产依赖..."
+echo_step "4/8 检查并增量安装依赖..."
 
 # 检查依赖文件是否有变化
 NEED_INSTALL=false
+DEPENDENCY_CHANGED=false
 
 if [ -d ".git" ] && [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
     # 检查 package.json 或 package-lock.json 是否有变化
     if git diff --name-only $CURRENT_COMMIT $NEW_COMMIT | grep -qE '^package(-lock)?\.json$'; then
-        echo_info "检测到依赖文件有变化,需要重新安装"
+        echo_info "检测到依赖文件有变化:"
+        git diff --name-only $CURRENT_COMMIT $NEW_COMMIT | grep -E '^package(-lock)?\.json$' | while read file; do
+            echo_info "  - $file"
+        done
+        DEPENDENCY_CHANGED=true
         NEED_INSTALL=true
     else
-        echo_info "依赖文件无变化,跳过安装"
+        echo_info "依赖文件无变化"
         NEED_INSTALL=false
     fi
 else
-    # 如果不是 git 仓库或版本信息缺失,或首次部署,检查 node_modules 是否存在
+    # 首次部署或无法确定变化时，检查 node_modules 是否存在
     if [ ! -d "node_modules" ]; then
         echo_info "node_modules 不存在,需要安装依赖"
         NEED_INSTALL=true
     else
-        echo_warn "无法确定依赖变化,为确保安全将重新安装"
-        NEED_INSTALL=true
+        echo_info "node_modules 已存在，跳过安装"
+        NEED_INSTALL=false
     fi
 fi
 
-# 执行依赖安装
+# 执行增量依赖安装（利用本地缓存）
 if [ "$NEED_INSTALL" = true ]; then
-    if [ -f "package-lock.json" ]; then
-        echo_info "使用 npm ci 安装依赖(更快且可靠)..."
-        NODE_ENV=production npm ci
+    echo_info "使用增量安装策略（保留现有依赖，仅安装缺失项）..."
+    
+    # 配置 npm 使用本地缓存优先策略
+    export NPM_CONFIG_LOGLEVEL=warn        # 减少日志输出
+    export NPM_CONFIG_PROGRESS=false       # 关闭进度条（减少输出）
+    export NPM_CONFIG_PREFER_OFFLINE=true  # 优先使用离线缓存
+    export NPM_CONFIG_NO_AUDIT=true        # 跳过安全审计
+    export NPM_CONFIG_NO_FUND=true         # 跳过赞助信息
+    
+    # 可选：使用国内镜像加速（取消下面注释即可启用）
+    # export NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+    
+    echo_info "开始增量安装依赖..."
+    if NODE_ENV=production npm install; then
+        echo_info "依赖安装成功 ✓"
     else
-        echo_warn "package-lock.json 不存在,使用 npm install..."
-        NODE_ENV=production npm install
+        echo_error "依赖安装失败"
+        echo_error "请检查 package.json 配置或网络连接"
+        exit 1
     fi
-    echo_info "依赖安装完成"
 else
-    echo_info "跳过依赖安装,使用现有依赖"
+    echo_info "跳过依赖安装，复用现有 node_modules"
+fi
+
+# 显示 node_modules 大小（用于监控）
+if [ -d "node_modules" ]; then
+    NODE_MODULES_SIZE=$(du -sh node_modules 2>/dev/null | cut -f1)
+    echo_info "node_modules 大小: $NODE_MODULES_SIZE"
 fi
 
 ###############################################################################
