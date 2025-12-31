@@ -2,7 +2,7 @@
 
 一个**练习吉他和弦**的在线 Web 应用：选和弦、看指法、听扫弦/分解、配节拍器，把练习步骤尽量做到“打开就能练”。
 
-- **在线体验（已上线）**：`https://rookiiie.top/play_chords`
+- **在线体验（已上线）**：[在线体验](https://rookiiie.top/play_chords)
 
 ## 预览截图
 
