@@ -25,9 +25,10 @@ export function Metronome() {
   } = useMetronome();
 
   // 使用本地状态管理输入框的值，避免受控组件导致的输入问题
-  const [bpmInput, setBpmInput] = useState(bpm.toString());
+  // 始终与 bpm 保持同步，避免 hydration 错误
+  const [bpmInput, setBpmInput] = useState('');
 
-  // 当 bpm 从外部更新时（如滑块），同步到输入框
+  // 当 bpm 从外部更新时（如滑块或初始加载），同步到输入框
   useEffect(() => {
     setBpmInput(bpm.toString());
   }, [bpm]);

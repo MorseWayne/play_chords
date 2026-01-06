@@ -165,24 +165,25 @@ export function useMetronome() {
   const metronomeGainNodeRef = useRef<GainNode | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(() => {
-    if (typeof window === 'undefined') return DEFAULT_BPM;
-    return loadBPM();
-  });
-  const [timeSignature, setTimeSignature] = useState<TimeSignature>(() => {
-    if (typeof window === 'undefined') return DEFAULT_TIME_SIGNATURE;
-    return loadTimeSignature();
-  });
-  const [volume, setVolume] = useState(() => {
-    if (typeof window === 'undefined') return DEFAULT_VOLUME;
-    return loadVolume();
-  });
+  // 使用默认值初始化，避免 hydration 错误
+  const [bpm, setBpm] = useState(DEFAULT_BPM);
+  const [timeSignature, setTimeSignature] = useState<TimeSignature>(DEFAULT_TIME_SIGNATURE);
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [currentBeat, setCurrentBeat] = useState(0); // 0 表示未开始，1-N 表示当前拍
   
   // 用于存储下一次节拍的调度时间和定时器
   const nextBeatTimeRef = useRef<number>(0);
   const schedulerIdRef = useRef<number | null>(null);
   const beatCountRef = useRef<number>(0); // 追踪已播放的拍数
+  
+  // 客户端首次加载时从 localStorage 恢复状态
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBpm(loadBPM());
+      setTimeSignature(loadTimeSignature());
+      setVolume(loadVolume());
+    }
+  }, []);
 
   /**
    * 初始化 AudioContext 和主音量节点

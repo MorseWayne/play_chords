@@ -23,7 +23,7 @@ module.exports = {
       // 环境变量
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
+        PORT: 10000,
       },
       
       // 自动重启配置
