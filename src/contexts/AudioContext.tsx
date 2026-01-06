@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import { ModernSoundfontLoader } from '@/lib/soundfont/ModernSoundfontLoader';
+import type { StrummingPattern, ArpeggioPattern } from '@/lib/rhythms';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -10,6 +11,9 @@ const STORAGE_KEY_VOLUME = 'audio-volume';
 const DEFAULT_VOLUME = 70;
 const MIN_VOLUME = 0;
 const MAX_VOLUME = 100;
+
+// 标准调弦的 MIDI 音高 (低到高): E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
+const STANDARD_TUNING_MIDI = [40, 45, 50, 55, 59, 64];
 
 // Soundfont 配置
 const SOUNDFONT_BASE_URL = (() => {
@@ -58,9 +62,19 @@ function clampVolume(volume: number): number {
   return Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, volume));
 }
 
+/**
+ * 和弦把位类型（用于节奏型播放）
+ */
+export interface ChordVoicing {
+  frets: number[];  // 每根弦的品位，-1 表示不弹
+}
+
 interface AudioContextValue {
   playStrum: (midiNotes: number[]) => Promise<void>;
   playArpeggio: (midiNotes: number[]) => Promise<void>;
+  playWithStrummingPattern: (voicing: ChordVoicing, pattern: StrummingPattern, bpm: number) => void;
+  playWithArpeggioPattern: (voicing: ChordVoicing, pattern: ArpeggioPattern, bpm: number) => void;
+  stopPatternPlayback: () => void;
   initAudio: () => Promise<void>;
   state: LoadState;
   isReady: boolean;
@@ -76,6 +90,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   // 使用 ref 存储音频资源，这样在组件重新渲染时不会丢失
   const audioContextRef = useRef<globalThis.AudioContext | null>(null);
   const loaderRef = useRef<ModernSoundfontLoader | null>(null);
+  const patternTimeoutsRef = useRef<number[]>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
 
@@ -174,6 +189,137 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [initAudio],
   );
 
+  /**
+   * 停止当前节奏型播放
+   */
+  const stopPatternPlayback = useCallback(() => {
+    patternTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+    patternTimeoutsRef.current = [];
+  }, []);
+
+  /**
+   * 根据和弦把位获取 MIDI 音符
+   */
+  const getVoicingMidiNotes = useCallback((voicing: ChordVoicing): number[] => {
+    return voicing.frets
+      .map((fret, idx) => (fret >= 0 ? STANDARD_TUNING_MIDI[idx] + fret : -1))
+      .filter((n) => n >= 0);
+  }, []);
+
+  /**
+   * 获取特定弦的 MIDI 音符
+   */
+  const getStringMidi = useCallback((voicing: ChordVoicing, stringNum: number): number | null => {
+    // stringNum: 1=高音e弦, 6=低音E弦
+    // 数组索引: 0=低音E弦, 5=高音e弦
+    const idx = 6 - stringNum;
+    if (idx < 0 || idx > 5) return null;
+    const fret = voicing.frets[idx];
+    if (fret < 0) return null;
+    return STANDARD_TUNING_MIDI[idx] + fret;
+  }, []);
+
+  /**
+   * 使用扫弦节奏型播放和弦
+   */
+  const playWithStrummingPattern = useCallback(
+    (voicing: ChordVoicing, pattern: StrummingPattern, bpm: number) => {
+      const loader = loaderRef.current;
+      const ctx = audioContextRef.current;
+      
+      if (!loader || !ctx) {
+        console.warn('[Audio] Cannot play pattern: loader or context missing');
+        return;
+      }
+
+      // 清除之前的播放
+      stopPatternPlayback();
+
+      // 计算时值
+      const beatMs = 60000 / bpm;
+      const sixteenthMs = beatMs / 4; // 十六分音符
+
+      // 获取所有 MIDI 音符
+      const allMidi = getVoicingMidiNotes(voicing);
+      if (allMidi.length === 0) return;
+
+      // 计算总时值用于归一化
+      const totalDuration = pattern.sequence.reduce((sum, a) => sum + (a.duration ?? 1), 0);
+      const avgDuration = totalDuration / pattern.sequence.length;
+
+      let currentTime = 0;
+
+      pattern.sequence.forEach((action, idx) => {
+        const duration = (action.duration ?? 1) / avgDuration * sixteenthMs;
+        
+        const timeoutId = window.setTimeout(() => {
+          // 根据扫弦方向排序音符
+          const sortedMidi = action.direction === 'down'
+            ? [...allMidi].sort((a, b) => a - b)  // 从低到高
+            : [...allMidi].sort((a, b) => b - a); // 从高到低
+
+          const notes = sortedMidi.map(midiToNoteName);
+          const gain = action.accent ? 1.2 : action.mute ? 0.3 : 1.0;
+          const noteDuration = action.mute ? 0.1 : 1.5;
+
+          if (action.mute) {
+            // 闷音：快速轻弹
+            loader.playStrum(notes, { duration: noteDuration, interval: 0.01, gain });
+          } else {
+            // 正常扫弦
+            loader.playStrum(notes, { duration: noteDuration, interval: 0.03, gain });
+          }
+        }, currentTime);
+
+        patternTimeoutsRef.current.push(timeoutId);
+        currentTime += duration;
+      });
+    },
+    [stopPatternPlayback, getVoicingMidiNotes],
+  );
+
+  /**
+   * 使用分解节奏型播放和弦
+   */
+  const playWithArpeggioPattern = useCallback(
+    (voicing: ChordVoicing, pattern: ArpeggioPattern, bpm: number) => {
+      const loader = loaderRef.current;
+      const ctx = audioContextRef.current;
+      
+      if (!loader || !ctx) {
+        console.warn('[Audio] Cannot play pattern: loader or context missing');
+        return;
+      }
+
+      // 清除之前的播放
+      stopPatternPlayback();
+
+      // 计算时值
+      const beatMs = 60000 / bpm;
+      const noteInterval = beatMs / 2; // 默认每个音符占半拍
+
+      let currentTime = 0;
+
+      pattern.sequence.forEach((note, idx) => {
+        const midi = getStringMidi(voicing, note.string);
+        if (midi === null) return;
+
+        const duration = (note.duration ?? 1) * noteInterval;
+        
+        const timeoutId = window.setTimeout(() => {
+          const noteName = midiToNoteName(midi);
+          const gain = note.accent ? 1.3 : 1.0;
+          
+          loader.play(noteName, 0, { duration: 1.2, gain });
+        }, currentTime);
+
+        patternTimeoutsRef.current.push(timeoutId);
+        currentTime += duration;
+      });
+    },
+    [stopPatternPlayback, getStringMidi],
+  );
+
   const updateVolume = useCallback((newVolume: number) => {
     const clampedVolume = clampVolume(newVolume);
     setVolume(clampedVolume);
@@ -188,6 +334,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const value: AudioContextValue = {
     playStrum,
     playArpeggio,
+    playWithStrummingPattern,
+    playWithArpeggioPattern,
+    stopPatternPlayback,
     initAudio,
     state,
     isReady: state === 'ready',

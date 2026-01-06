@@ -5,6 +5,7 @@ export interface CustomProgressionDefinition extends ProgressionDefinition {
   createdAt: number;
   updatedAt: number;
   isCustom: true;
+  isFavorite?: boolean;
 }
 
 const STORAGE_KEY = 'custom-progressions';
@@ -81,11 +82,22 @@ export function useCustomProgressions() {
     saveProgressions([]);
   }, []);
 
+  const toggleFavorite = useCallback((id: string) => {
+    setProgressions(prev => {
+      const updated = prev.map(p =>
+        p.id === id ? { ...p, isFavorite: !p.isFavorite, updatedAt: Date.now() } : p
+      );
+      saveProgressions(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     progressions,
     addProgression,
     updateProgression,
     deleteProgression,
     clearAll,
+    toggleFavorite,
   };
 }

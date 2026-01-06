@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Guitar, Home, Music2, Pause, Play, RotateCcw, SkipBack, SkipForward, Volume2, Plus } from 'lucide-react';
+import { Guitar, Home, Music2, Pause, Play, RotateCcw, SkipBack, SkipForward, Volume2, Plus, Search, X, Filter, Star, Trash2 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,9 @@ import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { useProgressionPlayer } from '@/hooks/useProgressionPlayer';
 import { useCustomProgressions, type CustomProgressionDefinition } from '@/hooks/useCustomProgressions';
 import { useVoicingPreferences } from '@/hooks/useVoicingPreferences';
+import { useRhythmPatternPreferences } from '@/hooks/useRhythmPatternPreferences';
+import { RhythmPatternSelector } from '@/components/RhythmPatternSelector';
+import type { StrummingPattern, ArpeggioPattern } from '@/lib/rhythms';
 import { ChordDiagram } from '@/components/ChordDiagram';
 import { formatSuffix, getAvailableKeys, getChordData } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
@@ -126,7 +129,7 @@ export default function ProgressionPracticePage() {
   });
 
   // 自定义走向管理
-  const { progressions: customProgressions, addProgression, deleteProgression } = useCustomProgressions();
+  const { progressions: customProgressions, addProgression, deleteProgression, toggleFavorite } = useCustomProgressions();
   
   // 自定义走向对话框状态
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
@@ -141,6 +144,20 @@ export default function ProgressionPracticePage() {
   
   // 把位偏好管理
   const { preferences: voicingPreferences, setVoicing: setVoicingPref } = useVoicingPreferences(progressionId);
+  
+  // 节奏型偏好管理
+  const {
+    preference: rhythmPreference,
+    currentPattern: rhythmPattern,
+    setPattern: setRhythmPattern,
+    clearPattern: clearRhythmPattern,
+    customPatterns: customRhythmPatterns,
+    addCustomPattern: addCustomRhythmPattern,
+    deleteCustomPattern: deleteCustomRhythmPattern,
+    allStrummingPatterns,
+    allArpeggioPatterns,
+  } = useRhythmPatternPreferences(progressionId);
+  
   const tonic = settings.tonic;
   const scaleMode = settings.scaleMode;
   const practiceMode = settings.practiceMode;
@@ -179,7 +196,17 @@ export default function ProgressionPracticePage() {
   const [earAnswer, setEarAnswer] = useState<string | null>(null);
   const [earResult, setEarResult] = useState<'idle' | 'correct' | 'wrong'>('idle');
 
-  const { initAudio, isReady, state: audioState, playArpeggio, playStrum, volume, updateVolume } = useAudio();
+  const { 
+    initAudio, 
+    isReady, 
+    state: audioState, 
+    playArpeggio, 
+    playStrum, 
+    playWithStrummingPattern,
+    playWithArpeggioPattern,
+    volume, 
+    updateVolume 
+  } = useAudio();
 
   // 合并预置走向和自定义走向
   const allProgressions: ProgressionDefinition[] = useMemo(() => {
@@ -215,6 +242,47 @@ export default function ProgressionPracticePage() {
       }
     }
   }, [customInput, customInputMode]);
+
+  // 走向分类筛选
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 获取所有可用的标签
+  const allTags = useMemo(() => {
+    const tagsSet = new Set<string>();
+    [...COMMON_PROGRESSIONS, ...customProgressions].forEach(p => {
+      p.tags.forEach(tag => tagsSet.add(tag));
+    });
+    return Array.from(tagsSet).sort();
+  }, [customProgressions]);
+
+  // 筛选后的走向（带排序）
+  const filteredProgressions = useMemo(() => {
+    let progs = [...COMMON_PROGRESSIONS, ...customProgressions];
+    
+    // 标签筛选
+    if (selectedTags.length > 0) {
+      progs = progs.filter(p => 
+        selectedTags.some(tag => p.tags.includes(tag))
+      );
+    }
+    
+    // 搜索筛选
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      progs = progs.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        (p.notes?.toLowerCase().includes(query) ?? false)
+      );
+    }
+    
+    // 排序：收藏的自定义走向置顶
+    return progs.sort((a, b) => {
+      const aFav = 'isFavorite' in a && a.isFavorite ? 1 : 0;
+      const bFav = 'isFavorite' in b && b.isFavorite ? 1 : 0;
+      return bFav - aFav;
+    });
+  }, [customProgressions, selectedTags, searchQuery]);
 
   // 保存自定义走向
   const handleSaveCustomProgression = useCallback(() => {
@@ -312,9 +380,21 @@ export default function ProgressionPracticePage() {
       // auto-play chord on each step (follow/memory); ear mode plays on-demand
       if (practiceMode === 'ear') return;
       const { chord } = getCurrentChordPosition(idx);
-      if (!chord?.midi) return;
-      if (playStyle === 'arpeggio') playArpeggio(chord.midi);
-      else playStrum(chord.midi);
+      if (!chord?.midi || !chord?.frets) return;
+      
+      // 如果设置了节奏型，使用节奏型播放
+      if (rhythmPattern) {
+        const voicing = { frets: chord.frets };
+        if (rhythmPattern.type === 'strumming') {
+          playWithStrummingPattern(voicing, rhythmPattern as StrummingPattern, bpm);
+        } else {
+          playWithArpeggioPattern(voicing, rhythmPattern as ArpeggioPattern, bpm);
+        }
+      } else {
+        // 否则使用简单的播放方式
+        if (playStyle === 'arpeggio') playArpeggio(chord.midi);
+        else playStrum(chord.midi);
+      }
     },
   });
 
@@ -333,11 +413,23 @@ export default function ProgressionPracticePage() {
       if (!ch) return;
       if (!isReady) await initAudio();
       const { chord } = getCurrentChordPosition(idx);
-      if (!chord?.midi) return;
-      if (playStyle === 'arpeggio') playArpeggio(chord.midi);
-      else playStrum(chord.midi);
+      if (!chord?.midi || !chord?.frets) return;
+      
+      // 如果设置了节奏型，使用节奏型播放
+      if (rhythmPattern) {
+        const voicing = { frets: chord.frets };
+        if (rhythmPattern.type === 'strumming') {
+          playWithStrummingPattern(voicing, rhythmPattern as StrummingPattern, bpm);
+        } else {
+          playWithArpeggioPattern(voicing, rhythmPattern as ArpeggioPattern, bpm);
+        }
+      } else {
+        // 否则使用简单的播放方式
+        if (playStyle === 'arpeggio') playArpeggio(chord.midi);
+        else playStrum(chord.midi);
+      }
     },
-    [generated, getCurrentChordPosition, initAudio, isReady, playArpeggio, playStrum, playStyle],
+    [generated, getCurrentChordPosition, initAudio, isReady, playArpeggio, playStrum, playStyle, rhythmPattern, playWithStrummingPattern, playWithArpeggioPattern, bpm],
   );
 
   // Keyboard shortcuts
@@ -405,16 +497,16 @@ export default function ProgressionPracticePage() {
   const subtitle = progression?.notes ?? '选择走向、设置参数，开始动态练习。';
 
   return (
-    <div className="min-h-screen bg-background pb-10">
+    <div className="min-h-screen bg-background pb-10 lg:pb-10 pb-24">{/* 移动端底部留空间 */}
       <header className="sticky top-0 z-10 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/55">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 border">
-              <Guitar className="h-5 w-5 text-primary" />
+        <div className="mx-auto flex h-14 lg:h-16 max-w-6xl items-center justify-between px-3 lg:px-4">
+          <div className="flex items-center gap-2 lg:gap-3">
+            <div className="grid h-8 w-8 lg:h-10 lg:w-10 place-items-center rounded-2xl bg-primary/10 border">
+              <Guitar className="h-4 w-4 lg:h-5 lg:w-5 text-primary" />
             </div>
             <div className="leading-tight">
-              <div className="text-base font-semibold">和弦走向练习</div>
-              <div className="text-xs text-muted-foreground">动态推进 · 强交互 · 可循环</div>
+              <div className="text-sm lg:text-base font-semibold">和弦走向练习</div>
+              <div className="text-[10px] lg:text-xs text-muted-foreground hidden sm:block">动态推进 · 强交互 · 可循环</div>
             </div>
           </div>
 
@@ -439,30 +531,165 @@ export default function ProgressionPracticePage() {
                 {COMMON_PROGRESSIONS.length} 个
               </Badge>
             </div>
-            <div className="mt-3 space-y-2">
-              <label className="text-[10px] text-muted-foreground block">选择走向</label>
-              <Select value={progressionId} onValueChange={(v) => setProgressionId(v)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="选择走向" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMON_PROGRESSIONS.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                  {customProgressions.length > 0 && (
-                    <>
-                      <Separator className="my-2" />
-                      {customProgressions.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} <Badge variant="outline" className="ml-2 text-[10px]">自定义</Badge>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+            <div className="mt-3 space-y-3">
+              <label className="text-[10px] text-muted-foreground block">走向库</label>
+              
+              {/* 搜索框 */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索走向..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 pl-9 pr-9"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* 标签筛选 */}
+              {allTags.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">风格筛选</span>
+                    {selectedTags.length > 0 && (
+                      <button
+                        onClick={() => setSelectedTags([])}
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        清除
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allTags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                        className="cursor-pointer text-[10px] h-6"
+                        onClick={() => {
+                          setSelectedTags(prev =>
+                            prev.includes(tag)
+                              ? prev.filter(t => t !== tag)
+                              : [...prev, tag]
+                          );
+                        }}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 走向选择器 */}
+              <div className="space-y-2">
+                <label className="text-[10px] text-muted-foreground block">
+                  选择走向 ({filteredProgressions.length})
+                </label>
+                <Select value={progressionId} onValueChange={(v) => setProgressionId(v)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="选择走向" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[400px]">
+                    {/* 预置走向 */}
+                    {filteredProgressions.filter(p => !('isCustom' in p)).length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          预置走向
+                        </div>
+                        {filteredProgressions
+                          .filter(p => !('isCustom' in p))
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{p.name}</span>
+                                {p.tags.slice(0, 2).map(tag => (
+                                  <Badge key={tag} variant="secondary" className="text-[9px] h-4 px-1">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </>
+                    )}
+                    
+                    {/* 自定义走向 */}
+                    {filteredProgressions.filter(p => 'isCustom' in p).length > 0 && (
+                      <>
+                        {filteredProgressions.filter(p => !('isCustom' in p)).length > 0 && (
+                          <Separator className="my-2" />
+                        )}
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          自定义走向
+                        </div>
+                        {filteredProgressions
+                          .filter(p => 'isCustom' in p)
+                          .map((p) => {
+                            const custom = p as CustomProgressionDefinition;
+                            return (
+                              <SelectItem key={p.id} value={p.id}>
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <div className="flex items-center gap-2">
+                                    {custom.isFavorite && (
+                                      <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                    )}
+                                    <span>{p.name}</span>
+                                    <Badge variant="outline" className="text-[9px] h-4 px-1">
+                                      自定义
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFavorite(p.id);
+                                      }}
+                                      className="hover:text-yellow-500"
+                                      title={custom.isFavorite ? '取消收藏' : '收藏'}
+                                    >
+                                      <Star className={`h-3 w-3 ${custom.isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm(`确定删除走向"${p.name}"吗？`)) {
+                                          deleteProgression(p.id);
+                                          // 如果删除的是当前选中的走向，切换到第一个
+                                          if (progressionId === p.id && allProgressions.length > 1) {
+                                            setProgressionId(allProgressions[0].id);
+                                          }
+                                        }
+                                      }}
+                                      className="hover:text-destructive"
+                                      title="删除"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                      </>
+                    )}
+
+                    {filteredProgressions.length === 0 && (
+                      <div className="px-2 py-8 text-center text-sm text-muted-foreground">
+                        没有找到匹配的走向
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <Button
                 variant="outline"
@@ -543,6 +770,22 @@ export default function ProgressionPracticePage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* 节奏型选择器 */}
+              <div className="pt-3 border-t mt-3">
+                <RhythmPatternSelector
+                  preference={rhythmPreference}
+                  currentPattern={rhythmPattern}
+                  onSelectPattern={setRhythmPattern}
+                  onClearPattern={clearRhythmPattern}
+                  customPatterns={customRhythmPatterns}
+                  onAddCustomPattern={addCustomRhythmPattern}
+                  onDeleteCustomPattern={deleteCustomRhythmPattern}
+                  previewVoicing={getCurrentChordPosition(player.currentIndex).chord ? { frets: getCurrentChordPosition(player.currentIndex).chord!.frets } : undefined}
+                  bpm={bpm}
+                  compact
+                />
               </div>
 
               <div className="pt-2">
@@ -703,37 +946,62 @@ export default function ProgressionPracticePage() {
                     </div>
                   </div>
                   
-                  {/* 把位按钮组 */}
+                  {/* 把位按钮组（优化视觉） */}
                   {currentTotal > 1 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {chordVoicings.get(player.currentIndex)?.map((voicing, vIdx) => {
-                        const positiveFrets = voicing.frets.filter(f => f > 0);
-                        const label = positiveFrets.length === 0 
-                          ? '开放' 
-                          : `${Math.min(...positiveFrets)}品`;
-                        
-                        return (
-                          <Button
-                            key={vIdx}
-                            size="sm"
-                            variant={vIdx === currentVariant ? 'default' : 'outline'}
-                            className="h-8 px-2 text-xs"
-                            onClick={() => {
-                              setVariant(player.currentIndex, vIdx);
-                              // 自动试听新把位
-                              const { chord } = getCurrentChordPosition(player.currentIndex);
-                              if (chord?.midi) {
-                                setTimeout(() => {
-                                  if (playStyle === 'arpeggio') playArpeggio(chord.midi);
-                                  else playStrum(chord.midi);
-                                }, 50);
-                              }
-                            }}
-                          >
-                            {label}
-                          </Button>
-                        );
-                      })}
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {chordVoicings.get(player.currentIndex)?.slice(0, 8).map((voicing, vIdx) => {
+                          const positiveFrets = voicing.frets.filter(f => f > 0);
+                          const minFret = positiveFrets.length === 0 ? 0 : Math.min(...positiveFrets);
+                          const maxFret = positiveFrets.length === 0 ? 0 : Math.max(...positiveFrets);
+                          const span = maxFret - minFret;
+                          
+                          // 指法说明
+                          const desc = minFret === 0 
+                            ? '开放和弦' 
+                            : span <= 3
+                              ? `${minFret}品 (跨${span}品)`
+                              : `${minFret}品 (跨${span}品·较难)`;
+                          
+                          return (
+                            <Button
+                              key={vIdx}
+                              size="sm"
+                              variant={vIdx === currentVariant ? 'default' : 'outline'}
+                              className={`h-auto px-2.5 py-1.5 flex flex-col items-start gap-0.5 ${
+                                span > 4 ? 'opacity-60' : ''
+                              }`}
+                              onClick={() => {
+                                setVariant(player.currentIndex, vIdx);
+                                // 自动试听新把位
+                                const { chord } = getCurrentChordPosition(player.currentIndex);
+                                if (chord?.midi) {
+                                  setTimeout(() => {
+                                    if (playStyle === 'arpeggio') playArpeggio(chord.midi);
+                                    else playStrum(chord.midi);
+                                  }, 50);
+                                }
+                              }}
+                              title={desc}
+                            >
+                              <span className="text-xs font-semibold">
+                                {minFret === 0 ? '开放' : `${minFret}品`}
+                              </span>
+                              {minFret > 0 && (
+                                <span className="text-[9px] text-muted-foreground">
+                                  跨{span}品
+                                </span>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      {currentTotal > 8 && (
+                        <div className="text-[10px] text-muted-foreground text-center">
+                          显示前 8 个常用把位，使用上/下按钮查看更多
+                        </div>
+                      )}
                     </div>
                   )}
                   
