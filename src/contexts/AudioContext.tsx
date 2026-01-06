@@ -1,14 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import Soundfont from 'soundfont-player';
+import { ModernSoundfontLoader } from '@/lib/soundfont/ModernSoundfontLoader';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
-type SoundfontInstrument = Awaited<ReturnType<typeof Soundfont.instrument>>;
-
-const SOUNDFONT_NAME = 'MusyngKite';
-const SOUNDFONT_FORMAT: 'mp3' | 'ogg' = 'mp3';
-const INSTRUMENT_NAME = 'acoustic_guitar_steel';
 
 // 音量控制常量
 const STORAGE_KEY_VOLUME = 'audio-volume';
@@ -16,8 +11,16 @@ const DEFAULT_VOLUME = 70;
 const MIN_VOLUME = 0;
 const MAX_VOLUME = 100;
 
+// Soundfont 配置
+const SOUNDFONT_BASE_URL = (() => {
+  const basePath = typeof window !== 'undefined' && process.env.NODE_ENV === 'production' 
+    ? '/play_chords' 
+    : '';
+  return `${basePath}/soundfonts/guitar`;
+})();
+
 function midiToNoteName(midi: number): string {
-  const pitchClasses = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const pitchClasses = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
   const pc = pitchClasses[((midi % 12) + 12) % 12];
   const octave = Math.floor(midi / 12) - 1;
   return `${pc}${octave}`;
@@ -55,12 +58,6 @@ function clampVolume(volume: number): number {
   return Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, volume));
 }
 
-function localNameToUrl(name: string, sf?: string, format?: string): string {
-  const realSf = sf === 'FluidR3_GM' ? sf : SOUNDFONT_NAME;
-  const realFormat = format === 'ogg' ? 'ogg' : SOUNDFONT_FORMAT;
-  return `/soundfonts/${realSf}/${name}-${realFormat}.js`;
-}
-
 interface AudioContextValue {
   playStrum: (midiNotes: number[]) => Promise<void>;
   playArpeggio: (midiNotes: number[]) => Promise<void>;
@@ -77,9 +74,8 @@ const AudioContext = createContext<AudioContextValue | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   // 使用 ref 存储音频资源，这样在组件重新渲染时不会丢失
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const instrumentRef = useRef<SoundfontInstrument | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
+  const audioContextRef = useRef<globalThis.AudioContext | null>(null);
+  const loaderRef = useRef<ModernSoundfontLoader | null>(null);
   const [state, setState] = useState<LoadState>('idle');
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
 
@@ -87,13 +83,13 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedVolume = loadVolume();
     setVolume(savedVolume);
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = savedVolume / 100;
+    if (loaderRef.current) {
+      loaderRef.current.setMasterGain(savedVolume / 100);
     }
   }, []);
 
   const initAudio = useCallback(async () => {
-    if (instrumentRef.current) return;
+    if (loaderRef.current) return;
     if (state === 'loading') return;
 
     setState('loading');
@@ -101,45 +97,28 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       const AudioContextCtor =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).AudioContext || (window as any).webkitAudioContext;
-      const ctx: AudioContext = audioContextRef.current ?? new AudioContextCtor();
+      const ctx: globalThis.AudioContext = audioContextRef.current ?? new AudioContextCtor();
       audioContextRef.current = ctx;
 
       if (ctx.state !== 'running') {
         await ctx.resume();
       }
 
-      // 创建主音量节点
-      if (!gainNodeRef.current) {
-        const gainNode = ctx.createGain();
-        gainNode.connect(ctx.destination);
-        gainNode.gain.value = volume / 100;
-        gainNodeRef.current = gainNode;
-      }
+      // 创建现代 soundfont 加载器
+      const loader = new ModernSoundfontLoader(ctx, SOUNDFONT_BASE_URL);
+      loaderRef.current = loader;
 
-      // Prefer local SoundFont under /public/soundfonts/... (works offline), fallback to CDN if needed.
-      let instrument: SoundfontInstrument | null = null;
-      try {
-        instrument = await Soundfont.instrument(ctx, INSTRUMENT_NAME, {
-          soundfont: SOUNDFONT_NAME,
-          format: SOUNDFONT_FORMAT,
-          nameToUrl: localNameToUrl,
-          gain: 0.9,
-          destination: gainNodeRef.current,
-        });
-      } catch (e) {
-        console.warn('[Audio] Failed to load from local, trying CDN...', e);
-        instrument = await Soundfont.instrument(ctx, INSTRUMENT_NAME, {
-          soundfont: SOUNDFONT_NAME,
-          format: SOUNDFONT_FORMAT,
-          gain: 0.9,
-          destination: gainNodeRef.current,
-        });
-      }
+      // 设置音量
+      loader.setMasterGain(volume / 100);
 
-      instrumentRef.current = instrument;
+      // 预加载吉他常用音符范围
+      console.log('[Audio] Preloading guitar range...');
+      await loader.preloadGuitarRange();
+      console.log('[Audio] Preload complete!');
+
       setState('ready');
     } catch (e) {
-      console.error('[Audio] Failed to init SoundFont guitar', e);
+      console.error('[Audio] Failed to init soundfont', e);
       setState('error');
     }
   }, [state, volume]);
@@ -147,10 +126,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playStrum = useCallback(
     async (midiNotes: number[]) => {
       await initAudio();
-      const instrument = instrumentRef.current;
+      const loader = loaderRef.current;
       const ctx = audioContextRef.current;
-      if (!instrument || !ctx) {
-        console.warn('[Audio] Cannot play: instrument or context missing');
+      
+      if (!loader || !ctx) {
+        console.warn('[Audio] Cannot play: loader or context missing');
         return;
       }
 
@@ -160,17 +140,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       }
 
       const notes = uniqSorted(midiNotes).map(midiToNoteName);
-      const now = ctx.currentTime;
       
-      // Low -> high strum
-      notes.forEach((note, index) => {
-        const scheduleTime = now + index * 0.04;
-        try {
-          instrument.play(note, scheduleTime, { duration: 2.2 });
-        } catch (e) {
-          console.error('[Audio] Failed to play note:', note, e);
-        }
-      });
+      try {
+        loader.playStrum(notes, { duration: 2.2, interval: 0.04 });
+      } catch (e) {
+        console.error('[Audio] Failed to play strum:', e);
+      }
     },
     [initAudio],
   );
@@ -178,15 +153,23 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playArpeggio = useCallback(
     async (midiNotes: number[]) => {
       await initAudio();
-      const instrument = instrumentRef.current;
+      const loader = loaderRef.current;
       const ctx = audioContextRef.current;
-      if (!instrument || !ctx) return;
+      
+      if (!loader || !ctx) return;
+
+      // 确保 AudioContext 处于运行状态
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
 
       const notes = uniqSorted(midiNotes).map(midiToNoteName);
-      const now = ctx.currentTime;
-      notes.forEach((note, index) => {
-        instrument.play(note, now + index * 0.22, { duration: 1.6 });
-      });
+      
+      try {
+        loader.playArpeggio(notes, { duration: 1.6, interval: 0.22 });
+      } catch (e) {
+        console.error('[Audio] Failed to play arpeggio:', e);
+      }
     },
     [initAudio],
   );
@@ -196,9 +179,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setVolume(clampedVolume);
     saveVolume(clampedVolume);
     
-    // 立即更新主音量节点
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = clampedVolume / 100;
+    // 立即更新音量
+    if (loaderRef.current) {
+      loaderRef.current.setMasterGain(clampedVolume / 100);
     }
   }, []);
 
