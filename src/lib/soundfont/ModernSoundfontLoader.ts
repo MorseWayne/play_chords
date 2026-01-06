@@ -47,7 +47,7 @@ export class ModernSoundfontLoader {
     }
 
     this.manifest = await response.json();
-    return this.manifest;
+    return this.manifest!;
   }
 
   /**

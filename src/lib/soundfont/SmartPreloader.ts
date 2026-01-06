@@ -30,7 +30,9 @@ export class SmartPreloader {
       this.recentlyUsedNotes.add(note);
       if (this.recentlyUsedNotes.size > this.maxRecentNotes) {
         const first = this.recentlyUsedNotes.values().next().value;
-        this.recentlyUsedNotes.delete(first);
+        if (first) {
+          this.recentlyUsedNotes.delete(first);
+        }
       }
     });
 

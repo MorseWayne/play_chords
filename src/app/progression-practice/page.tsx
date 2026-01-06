@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Guitar, Home, Music2, Pause, Play, RotateCcw, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import { Guitar, Home, Music2, Pause, Play, RotateCcw, SkipBack, SkipForward, Volume2, Plus } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,16 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useAudio } from '@/hooks/useAudio';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { useProgressionPlayer } from '@/hooks/useProgressionPlayer';
+import { useCustomProgressions, type CustomProgressionDefinition } from '@/hooks/useCustomProgressions';
+import { useVoicingPreferences } from '@/hooks/useVoicingPreferences';
 import { ChordDiagram } from '@/components/ChordDiagram';
 import { formatSuffix, getAvailableKeys, getChordData } from '@/lib/chords';
 import { generateGuitarVoicings, pickPracticalVoicings } from '@/lib/voicings';
@@ -28,6 +34,14 @@ import {
   type ProgressionDefinition,
   type ProgressionMode,
 } from '@/lib/progressions';
+import {
+  parseRomanNumeralString,
+  validateRomanNumeralInput,
+  parseChordNameString,
+  validateChordNameInput,
+  convertChordNamesToProgression,
+  type ValidationResult,
+} from '@/lib/progressions-utils';
 
 type PracticeMode = 'follow' | 'memory' | 'ear';
 
@@ -111,7 +125,22 @@ export default function ProgressionPracticePage() {
     serialize: (value) => JSON.stringify(value),
   });
 
+  // 自定义走向管理
+  const { progressions: customProgressions, addProgression, deleteProgression } = useCustomProgressions();
+  
+  // 自定义走向对话框状态
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customInput, setCustomInput] = useState('');
+  const [customInputMode, setCustomInputMode] = useState<'roman' | 'chord'>('roman');
+  const [customValidation, setCustomValidation] = useState<ValidationResult | null>(null);
+  const [customInferredKey, setCustomInferredKey] = useState('C');
+  const [customInferredMode, setCustomInferredMode] = useState<ProgressionMode>('major');
+
   const progressionId = settings.progressionId;
+  
+  // 把位偏好管理
+  const { preferences: voicingPreferences, setVoicing: setVoicingPref } = useVoicingPreferences(progressionId);
   const tonic = settings.tonic;
   const scaleMode = settings.scaleMode;
   const practiceMode = settings.practiceMode;
@@ -152,10 +181,81 @@ export default function ProgressionPracticePage() {
 
   const { initAudio, isReady, state: audioState, playArpeggio, playStrum, volume, updateVolume } = useAudio();
 
+  // 合并预置走向和自定义走向
+  const allProgressions: ProgressionDefinition[] = useMemo(() => {
+    return [...COMMON_PROGRESSIONS, ...customProgressions];
+  }, [customProgressions]);
+
   const progression: ProgressionDefinition | undefined = useMemo(
-    () => COMMON_PROGRESSIONS.find((p) => p.id === progressionId) ?? COMMON_PROGRESSIONS[0],
-    [progressionId],
+    () => allProgressions.find((p) => p.id === progressionId) ?? allProgressions[0],
+    [progressionId, allProgressions],
   );
+
+  // 自定义走向输入验证
+  useEffect(() => {
+    if (!customInput) {
+      setCustomValidation(null);
+      return;
+    }
+
+    if (customInputMode === 'roman') {
+      const validation = validateRomanNumeralInput(customInput);
+      setCustomValidation(validation);
+    } else {
+      const validation = validateChordNameInput(customInput);
+      setCustomValidation(validation);
+      
+      // 如果验证通过，尝试推断调性
+      if (validation.valid) {
+        const parsed = parseChordNameString(customInput);
+        if (parsed) {
+          setCustomInferredKey(parsed.inferredKey ?? 'C');
+          setCustomInferredMode(parsed.inferredMode ?? 'major');
+        }
+      }
+    }
+  }, [customInput, customInputMode]);
+
+  // 保存自定义走向
+  const handleSaveCustomProgression = useCallback(() => {
+    if (!customName.trim() || !customInput.trim() || !customValidation?.valid) {
+      return;
+    }
+
+    let romanNumerals: string[];
+
+    if (customInputMode === 'roman') {
+      romanNumerals = parseRomanNumeralString(customInput);
+    } else {
+      // 和弦名称模式：先解析，然后转换为罗马数字
+      const parsed = parseChordNameString(customInput);
+      if (!parsed) return;
+
+      // 使用推断的或用户指定的调性
+      const chords = convertChordNamesToProgression(parsed.chords, customInferredKey, customInferredMode);
+      romanNumerals = chords.map(c => c.roman);
+    }
+
+    const newProgression: Omit<CustomProgressionDefinition, 'createdAt' | 'updatedAt' | 'isCustom'> = {
+      id: `custom-${Date.now()}`,
+      name: customName.trim(),
+      romanNumerals,
+      tags: ['custom'],
+      defaultBpm: 100,
+      notes: customInputMode === 'chord' ? `基于和弦：${customInput}` : undefined,
+    };
+
+    const saved = addProgression(newProgression);
+    
+    // 切换到新创建的走向
+    setProgressionId(saved.id);
+    
+    // 关闭对话框并重置
+    setCustomDialogOpen(false);
+    setCustomName('');
+    setCustomInput('');
+    setCustomValidation(null);
+  }, [customName, customInput, customValidation, customInputMode, customInferredKey, customInferredMode, addProgression, setProgressionId]);
 
   const generated = useMemo(() => {
     if (!progression) return [];
@@ -182,6 +282,11 @@ export default function ProgressionPracticePage() {
   }, [generated]);
 
   const [variantByIndex, setVariantByIndex] = useState<Record<number, number>>({});
+
+  // 从持久化偏好加载把位设置
+  useEffect(() => {
+    setVariantByIndex(voicingPreferences);
+  }, [progressionId, voicingPreferences]);
 
   const getCurrentChordPosition = useCallback(
     (idx: number) => {
@@ -288,7 +393,12 @@ export default function ProgressionPracticePage() {
   );
 
   const setVariant = (idx: number, v: number) => {
-    setVariantByIndex((m) => ({ ...m, [idx]: v }));
+    setVariantByIndex((m) => {
+      const updated = { ...m, [idx]: v };
+      // 保存到持久化存储
+      setVoicingPref(idx, v);
+      return updated;
+    });
   };
 
   const title = progression?.name ?? '走向练习';
@@ -341,8 +451,28 @@ export default function ProgressionPracticePage() {
                       {p.name}
                     </SelectItem>
                   ))}
+                  {customProgressions.length > 0 && (
+                    <>
+                      <Separator className="my-2" />
+                      {customProgressions.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} <Badge variant="outline" className="ml-2 text-[10px]">自定义</Badge>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 gap-2"
+                onClick={() => setCustomDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                添加自定义走向
+              </Button>
 
               <div className="pt-2 text-xs">
                 <div className="font-medium">{title}</div>
@@ -567,11 +697,46 @@ export default function ProgressionPracticePage() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">变体</div>
+                    <div className="text-xs text-muted-foreground">把位选择</div>
                     <div className="text-xs text-muted-foreground">
                       {currentTotal > 0 ? `${currentVariant + 1}/${currentTotal}` : '0/0'}
                     </div>
                   </div>
+                  
+                  {/* 把位按钮组 */}
+                  {currentTotal > 1 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {chordVoicings.get(player.currentIndex)?.map((voicing, vIdx) => {
+                        const positiveFrets = voicing.frets.filter(f => f > 0);
+                        const label = positiveFrets.length === 0 
+                          ? '开放' 
+                          : `${Math.min(...positiveFrets)}品`;
+                        
+                        return (
+                          <Button
+                            key={vIdx}
+                            size="sm"
+                            variant={vIdx === currentVariant ? 'default' : 'outline'}
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setVariant(player.currentIndex, vIdx);
+                              // 自动试听新把位
+                              const { chord } = getCurrentChordPosition(player.currentIndex);
+                              if (chord?.midi) {
+                                setTimeout(() => {
+                                  if (playStyle === 'arpeggio') playArpeggio(chord.midi);
+                                  else playStrum(chord.midi);
+                                }, 50);
+                              }
+                            }}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       size="sm"
@@ -787,6 +952,146 @@ export default function ProgressionPracticePage() {
           </div>
         </Card>
       </main>
+
+      {/* 自定义走向对话框 */}
+      <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>添加自定义走向</DialogTitle>
+            <DialogDescription>
+              输入罗马数字或和弦名称来创建自己的和弦走向
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="custom-name">走向名称</Label>
+              <Input
+                id="custom-name"
+                placeholder="我的练习走向"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            <Tabs value={customInputMode} onValueChange={(v) => setCustomInputMode(v as 'roman' | 'chord')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="roman">罗马数字</TabsTrigger>
+                <TabsTrigger value="chord">和弦名称</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="roman" className="space-y-3">
+                <div>
+                  <Label htmlFor="roman-input">罗马数字序列</Label>
+                  <Textarea
+                    id="roman-input"
+                    placeholder="I V vi IV"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    className="mt-1 font-mono"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    示例：I V vi IV 或 ii7 V7 Imaj7（空格、逗号、短横线分隔均可）
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="chord" className="space-y-3">
+                <div>
+                  <Label htmlFor="chord-input">和弦名称序列</Label>
+                  <Textarea
+                    id="chord-input"
+                    placeholder="C Am F G"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    className="mt-1 font-mono"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    示例：C Am F G 或 Dm7 G7 Cmaj7（空格、逗号、短横线分隔均可）
+                  </p>
+                </div>
+
+                {customValidation?.valid && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="inferred-key">推断调性</Label>
+                      <Select value={customInferredKey} onValueChange={setCustomInferredKey}>
+                        <SelectTrigger id="inferred-key" className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {keys.map((k) => (
+                            <SelectItem key={k} value={k}>{k}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="inferred-mode">大小调</Label>
+                      <Select value={customInferredMode} onValueChange={(v) => setCustomInferredMode(v as ProgressionMode)}>
+                        <SelectTrigger id="inferred-mode" className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="major">大调 (Major)</SelectItem>
+                          <SelectItem value="minor">小调 (Minor)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {customValidation && !customValidation.valid && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <ul className="list-disc list-inside space-y-1">
+                    {customValidation.errors.map((error, idx) => (
+                      <li key={idx}>{error.message}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {customValidation?.warnings && customValidation.warnings.length > 0 && (
+              <Alert>
+                <AlertDescription>
+                  <ul className="list-disc list-inside space-y-1">
+                    {customValidation.warnings.map((warning, idx) => (
+                      <li key={idx}>{warning.message}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCustomDialogOpen(false);
+                setCustomName('');
+                setCustomInput('');
+                setCustomValidation(null);
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleSaveCustomProgression}
+              disabled={!customName.trim() || !customValidation?.valid}
+            >
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
