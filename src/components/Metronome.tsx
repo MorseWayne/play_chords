@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,14 +24,41 @@ export function Metronome() {
     timeSignatureConfig,
   } = useMetronome();
 
+  // 使用本地状态管理输入框的值，避免受控组件导致的输入问题
+  const [bpmInput, setBpmInput] = useState(bpm.toString());
+
+  // 当 bpm 从外部更新时（如滑块），同步到输入框
+  useEffect(() => {
+    setBpmInput(bpm.toString());
+  }, [bpm]);
+
   const handleBPMChange = (values: number[]) => {
     updateBPM(values[0]);
   };
 
   const handleBPMInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (!isNaN(value)) {
-      updateBPM(value);
+    const value = e.target.value;
+    // 允许用户输入任何内容（包括空值），不立即验证
+    setBpmInput(value);
+  };
+
+  const handleBPMInputBlur = () => {
+    const numValue = parseInt(bpmInput, 10);
+    if (isNaN(numValue) || bpmInput === '') {
+      // 如果无效或为空，恢复到当前 BPM 值
+      setBpmInput(bpm.toString());
+    } else {
+      // 失焦时确保值在有效范围内
+      const clampedValue = Math.max(minBPM, Math.min(maxBPM, numValue));
+      updateBPM(clampedValue);
+      setBpmInput(clampedValue.toString());
+    }
+  };
+
+  const handleBPMInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // 按 Enter 键时触发失焦行为
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
     }
   };
 
@@ -91,22 +118,27 @@ export function Metronome() {
       </div>
 
       {/* 视觉节拍指示器 */}
-      <div className="flex items-center justify-center gap-3 py-6">
+      <div className="flex items-center justify-center gap-3 py-6 min-h-[64px]">
         {beats.map((beat) => (
           <div
             key={beat}
-            className={cn(
-              'rounded-full transition-all duration-100',
-              currentBeat === beat
-                ? isStrongBeat(beat)
-                  ? 'h-8 w-8 bg-primary scale-125 shadow-xl shadow-primary/50'
-                  : 'h-7 w-7 bg-primary scale-110 shadow-lg shadow-primary/30'
-                : isStrongBeat(beat)
-                ? 'h-6 w-6 bg-muted/80 ring-2 ring-muted-foreground/20'
-                : 'h-5 w-5 bg-muted/60',
-            )}
-            aria-label={`第 ${beat} 拍${currentBeat === beat ? '（当前）' : ''}${isStrongBeat(beat) ? '（强拍）' : ''}`}
-          />
+            className="relative flex items-center justify-center"
+            style={{ width: '32px', height: '32px' }}
+          >
+            <div
+              className={cn(
+                'absolute rounded-full transition-all duration-100',
+                currentBeat === beat
+                  ? isStrongBeat(beat)
+                    ? 'h-8 w-8 bg-primary shadow-xl shadow-primary/50'
+                    : 'h-7 w-7 bg-primary shadow-lg shadow-primary/30'
+                  : isStrongBeat(beat)
+                  ? 'h-6 w-6 bg-muted/80 ring-2 ring-muted-foreground/20'
+                  : 'h-5 w-5 bg-muted/60',
+              )}
+              aria-label={`第 ${beat} 拍${currentBeat === beat ? '（当前）' : ''}${isStrongBeat(beat) ? '（强拍）' : ''}`}
+            />
+          </div>
         ))}
       </div>
 
@@ -150,8 +182,10 @@ export function Metronome() {
           </div>
           <input
             type="number"
-            value={bpm}
+            value={bpmInput}
             onChange={handleBPMInputChange}
+            onBlur={handleBPMInputBlur}
+            onKeyDown={handleBPMInputKeyDown}
             min={minBPM}
             max={maxBPM}
             className="w-20 px-3 py-2 text-base text-center border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
