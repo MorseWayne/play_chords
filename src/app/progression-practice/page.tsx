@@ -150,7 +150,7 @@ export default function ProgressionPracticePage() {
   const [earAnswer, setEarAnswer] = useState<string | null>(null);
   const [earResult, setEarResult] = useState<'idle' | 'correct' | 'wrong'>('idle');
 
-  const { initAudio, isReady, state: audioState, playArpeggio, playStrum } = useAudio();
+  const { initAudio, isReady, state: audioState, playArpeggio, playStrum, volume, updateVolume } = useAudio();
 
   const progression: ProgressionDefinition | undefined = useMemo(
     () => COMMON_PROGRESSIONS.find((p) => p.id === progressionId) ?? COMMON_PROGRESSIONS[0],
@@ -454,6 +454,21 @@ export default function ProgressionPracticePage() {
                     }
                     inputMode="numeric"
                   />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <label className="text-[10px] text-muted-foreground mb-1 block">音量（0-100）</label>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <Slider
+                    value={[volume]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(values) => updateVolume(values[0])}
+                  />
+                  <span className="text-xs text-muted-foreground w-12 text-right">{volume}</span>
                 </div>
               </div>
 

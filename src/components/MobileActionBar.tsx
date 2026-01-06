@@ -2,9 +2,11 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { ChevronLeft, ChevronRight, Music, Play, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Music, Play, Sparkles, Volume2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ChordPosition } from '@/lib/chords';
 import { useAudio } from '@/hooks/useAudio';
 
@@ -23,8 +25,9 @@ export function MobileActionBar({
   onPrevVariant,
   onNextVariant,
 }: MobileActionBarProps) {
-  const { playStrum, playArpeggio, initAudio, isReady, state } = useAudio();
+  const { playStrum, playArpeggio, initAudio, isReady, state, volume, updateVolume } = useAudio();
   const lastStateRef = React.useRef(state);
+  const [volumeSheetOpen, setVolumeSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (lastStateRef.current === state) return;
@@ -80,7 +83,32 @@ export function MobileActionBar({
                 {state === 'loading' ? '加载中…' : '加载音色'}
               </Button>
             ) : (
-              <div className="hidden sm:block text-xs text-muted-foreground">音色就绪</div>
+              <>
+                <Sheet open={volumeSheetOpen} onOpenChange={setVolumeSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-2xl">
+                      <Volume2 className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="rounded-t-[20px]">
+                    <SheetHeader>
+                      <SheetTitle>音量调节</SheetTitle>
+                    </SheetHeader>
+                    <div className="flex items-center gap-3 py-6">
+                      <Volume2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <Slider
+                        value={[volume]}
+                        onValueChange={(values) => updateVolume(values[0])}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium w-12 text-right">{volume}</span>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </>
             )}
 
             <Button
