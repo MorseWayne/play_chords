@@ -1,0 +1,135 @@
+diff --git a/dist/index.js b/dist/index.js
+index 5ba7a95bc7a29605f32aa010a14224ad87bf6589..d1ce54f52459bda7ec785ad88b8f6e3d01c726e0 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -39,36 +39,42 @@ module.exports = __toCommonJS(index_exports);
+ var React = __toESM(require("react"));
+ function setRef(ref, value) {
+   if (typeof ref === "function") {
+-    return ref(value);
++    const cleanup = ref(value);
++    // Only return cleanup if it's actually a function
++    if (typeof cleanup === "function") {
++      return cleanup;
++    }
++    return;
+   } else if (ref !== null && ref !== void 0) {
+     ref.current = value;
+   }
+ }
+ function composeRefs(...refs) {
+   return (node) => {
+-    let hasCleanup = false;
+-    const cleanups = refs.map((ref) => {
+-      const cleanup = setRef(ref, node);
+-      if (!hasCleanup && typeof cleanup == "function") {
+-        hasCleanup = true;
+-      }
+-      return cleanup;
+-    });
+-    if (hasCleanup) {
+-      return () => {
+-        for (let i = 0; i < cleanups.length; i++) {
+-          const cleanup = cleanups[i];
+-          if (typeof cleanup == "function") {
+-            cleanup();
+-          } else {
+-            setRef(refs[i], null);
+-          }
++    const cleanups = [];
++    for (let i = 0; i < refs.length; i++) {
++      const ref = refs[i];
++      if (ref) {
++        const cleanup = setRef(ref, node);
++        if (typeof cleanup === "function") {
++          cleanups.push(cleanup);
++        } else {
++          // Store the ref for cleanup later
++          cleanups.push(() => setRef(ref, null));
+         }
+-      };
++      }
+     }
++    // Always return a cleanup function to be consistent
++    return () => {
++      for (const cleanup of cleanups) {
++        cleanup();
++      }
++    };
+   };
+ }
+ function useComposedRefs(...refs) {
+-  return React.useCallback(composeRefs(...refs), refs);
++  // Use useMemo to avoid creating new functions on every render
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  return React.useMemo(() => composeRefs(...refs), refs);
+ }
+ //# sourceMappingURL=index.js.map
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 7dd9172a7228d70a25f708d0fd577cfc69ea15a8..851e821ed3876033aaefa0dd673a26e4c54b8231 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -2,37 +2,43 @@
+ import * as React from "react";
+ function setRef(ref, value) {
+   if (typeof ref === "function") {
+-    return ref(value);
++    const cleanup = ref(value);
++    // Only return cleanup if it's actually a function
++    if (typeof cleanup === "function") {
++      return cleanup;
++    }
++    return;
+   } else if (ref !== null && ref !== void 0) {
+     ref.current = value;
+   }
+ }
+ function composeRefs(...refs) {
+   return (node) => {
+-    let hasCleanup = false;
+-    const cleanups = refs.map((ref) => {
+-      const cleanup = setRef(ref, node);
+-      if (!hasCleanup && typeof cleanup == "function") {
+-        hasCleanup = true;
+-      }
+-      return cleanup;
+-    });
+-    if (hasCleanup) {
+-      return () => {
+-        for (let i = 0; i < cleanups.length; i++) {
+-          const cleanup = cleanups[i];
+-          if (typeof cleanup == "function") {
+-            cleanup();
+-          } else {
+-            setRef(refs[i], null);
+-          }
++    const cleanups = [];
++    for (let i = 0; i < refs.length; i++) {
++      const ref = refs[i];
++      if (ref) {
++        const cleanup = setRef(ref, node);
++        if (typeof cleanup === "function") {
++          cleanups.push(cleanup);
++        } else {
++          // Store the ref for cleanup later
++          cleanups.push(() => setRef(ref, null));
+         }
+-      };
++      }
+     }
++    // Always return a cleanup function to be consistent
++    return () => {
++      for (const cleanup of cleanups) {
++        cleanup();
++      }
++    };
+   };
+ }
+ function useComposedRefs(...refs) {
+-  return React.useCallback(composeRefs(...refs), refs);
++  // Use useMemo to avoid creating new functions on every render
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  return React.useMemo(() => composeRefs(...refs), refs);
+ }
+ export {
+   composeRefs,
